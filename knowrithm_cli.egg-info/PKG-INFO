@@ -1,0 +1,147 @@
+Metadata-Version: 2.4
+Name: knowrithm-cli
+Version: 0.1.0
+Summary: Command line interface for the Knowrithm enterprise multi-agent platform.
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: click>=8.1
+Requires-Dist: requests>=2.31
+
+# Knowrithm CLI
+
+A Python command-line interface for the Knowrithm enterprise multi-agent chatbot platform. The CLI wraps the REST endpoints described in the platform documentation and `apispec_1.json`, enabling developers and operators to provision agents, ingest content, manage leads, and query analytics directly from the terminal.
+
+## Features
+
+- Authentication helpers for JWT sessions and API-key credentials.
+- Agent lifecycle management (create, clone, update, delete, restore, stats, testing, embed code).
+- Conversation utilities (list, create, chat, message management).
+- Document ingestion (file uploads, URL scraping) and semantic search.
+- Database connection management, schema analysis, knowledge graphs, text-to-SQL, and exports.
+- Lead, company, settings, analytics, website awareness, and system utilities.
+- Support for asynchronous Celery tasks with optional polling (`--wait` flags).
+
+## Installation
+
+```bash
+# Optional: use a virtual environment
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Install the CLI in editable mode
+pip install -e .
+```
+
+The executable script `knowrithm` will be available on your `$PATH`.
+
+## Configuration
+
+1. Set the API base URL (most deployments use `https://<your-host>/api`):
+
+   ```bash
+   knowrithm config set-base-url https://demo.knowrithm.local
+   ```
+
+2. Optionally disable TLS verification (for self-signed certificates):
+
+   ```bash
+   knowrithm config set-verify-ssl --disable
+   ```
+
+3. Authenticate:
+
+   - Email + password:
+
+     ```bash
+     knowrithm auth login --email admin@example.com
+     ```
+
+   - or store an API key / secret pair:
+
+     ```bash
+     knowrithm auth set-api-key
+     ```
+
+Configuration is stored in `~/.knowrithm/config.json`. Run `knowrithm config show` to inspect or `knowrithm auth clear --all` to reset credentials.
+
+## Usage Overview
+
+All commands support `--help`:
+
+```bash
+knowrithm --help
+knowrithm agent --help
+knowrithm document upload --help
+```
+
+Common workflows:
+
+- **Agents**
+
+  ```bash
+  knowrithm agent list
+  knowrithm agent create --payload @agent.json
+  knowrithm agent update <agent_id> --payload '{"status": "inactive"}'
+  knowrithm agent test <agent_id> --payload '{"query": "Hello"}'
+  ```
+
+- **Documents**
+
+  ```bash
+  knowrithm document upload --agent-id <agent_id> --file ./docs/faq.pdf
+  knowrithm document search --payload '{"query": "refund policy", "agent_id": "<agent_id>"}'
+  ```
+
+- **Conversations**
+
+  ```bash
+  knowrithm conversation list
+  knowrithm conversation create --payload '{"agent_id": "..."}'
+  knowrithm conversation chat <conversation_id> --payload '{"message": "Hi!"}'
+  ```
+
+- **Database integrations**
+
+  ```bash
+  knowrithm database create --payload @db.json
+  knowrithm database analyze <connection_id> --wait
+  knowrithm database text-to-sql <connection_id> --payload '{"question": "Show top customers"}'
+  ```
+
+- **Analytics**
+
+  ```bash
+  knowrithm analytics dashboard
+  knowrithm analytics export --payload '{"type": "usage", "format": "json"}'
+  ```
+
+- **Website awareness**
+
+  ```bash
+  knowrithm website register --payload @source.json
+  knowrithm website crawl <source_id> --wait
+  ```
+
+### Authentication selection
+
+Many sub-commands accept `--auth` with `auto` (default), `jwt`, `api-key`, or `none`. Use this when an endpoint requires a specific credential type.
+
+### JSON payload shortcuts
+
+Options labelled `--payload` accept either inline JSON strings or `@path/to/file.json`, mirroring `curl`.
+
+### Asynchronous tasks
+
+Endpoints that return `{ "task_id": ... }` can be polled automatically by passing `--wait`. The CLI will query `/api/v1/tasks/<task_id>/status` until completion.
+
+## Development
+
+- Code lives under `knowrithm_cli/`.
+- Command groups are organised in `knowrithm_cli/commands/`.
+- Run formatting and basic smoke tests:
+
+  ```bash
+  python -m compileall knowrithm_cli
+  ```
+
+Contributions welcome!
