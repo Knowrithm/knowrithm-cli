@@ -3883,7 +3883,7 @@ knowrithm agent list
 
 - **API Documentation**: https://docs.knowrithm.com
 - **Support**: support@knowrithm.com
-- **GitHub**: https://github.com/knowrithm/cli
+- **GitHub**: https://github.com/knowrithm/knowrithm-cli
 
 ---
 
