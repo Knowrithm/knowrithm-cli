@@ -661,7 +661,7 @@ knowrithm agent embed-code agent_123
 ```json
 {
   "agent_id": "agent_123",
-  "embed_code": "<script src=\"https://cdn.knowrithm.com/widget.js\" data-agent-id=\"agent_123\"></script>",
+  "embed_code": "<script src=\"https://cdn.knowrithm.org/widget.js\" data-agent-id=\"agent_123\"></script>",
   "configuration": {
     "position": "bottom-right",
     "theme": "light",
@@ -3660,7 +3660,7 @@ knowrithm config show
 **Response:**
 ```json
 {
-  "base_url": "https://api.knowrithm.com",
+  "base_url": "https://app.knowrithm.org",
   "verify_ssl": true,
   "auth": {
     "jwt": {
@@ -3692,13 +3692,7 @@ knowrithm config set-base-url URL
 **Examples:**
 ```bash
 # Production
-knowrithm config set-base-url https://api.knowrithm.com
-
-# Staging
-knowrithm config set-base-url https://staging.knowrithm.com
-
-# Local development
-knowrithm config set-base-url http://localhost:8000
+knowrithm config set-base-url https://app.knowrithm.org
 ```
 
 ---
@@ -3832,7 +3826,7 @@ The CLI respects the following environment variables:
 
 **Example:**
 ```bash
-export KNOWRITHM_BASE_URL=https://staging.knowrithm.com
+export KNOWRITHM_BASE_URL=https://app.knowrithm.org
 export KNOWRITHM_DEBUG=1
 knowrithm agent list
 ```
@@ -3881,8 +3875,8 @@ knowrithm agent list
 
 ## Additional Resources
 
-- **API Documentation**: https://docs.knowrithm.com
-- **Support**: support@knowrithm.com
+- **API Documentation**: https://docs.knowrithm.org
+- **Support**: support@knowrithm.org
 - **GitHub**: https://github.com/knowrithm/knowrithm-cli
 
 ---

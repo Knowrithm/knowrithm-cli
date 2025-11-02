@@ -112,7 +112,7 @@ Configuration is stored in `~/.knowrithm/config.json` with the following structu
 
 ```json
 {
-  "base_url": "https://api.knowrithm.com",
+  "base_url": "https://app.knowrithm.org",
   "verify_ssl": true,
   "auth": {
     "jwt": {
@@ -981,8 +981,8 @@ knowrithm system health
 For issues and questions:
 - Check the troubleshooting section above
 - Review command help: `knowrithm COMMAND --help`
-- Contact Knowrithm support: support@knowrithm.com
-- API Documentation: https://docs.knowrithm.com
+- Contact Knowrithm support: support@knowrithm.org
+- API Documentation: https://docs.knowrithm.org
 
 ## License
 
