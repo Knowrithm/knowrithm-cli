@@ -92,17 +92,43 @@ class Formatter:
         if not data:
             return "No data to display"
 
-        # Handle single dict
+        # Handle single dict - extract list data from various response structures
         if isinstance(data, dict):
-            # Check if it contains a list under 'data' key
-            if "data" in data and isinstance(data["data"], list):
-                data = data["data"]
+            # Common list keys in API responses
+            list_keys = ["data", "agents", "documents", "connection", "databases", 
+                        "conversations", "leads", "companies", "users", "website_sources"]
+            
+            # Common single-entity keys (for get commands)
+            single_entity_keys = ["agent", "document", "conversation", "lead", 
+                                 "company", "user", "database_connection", "website_source"]
+            
+            # Try known list keys first
+            for key in list_keys:
+                if key in data and isinstance(data[key], list):
+                    data = data[key]
+                    break
             else:
-                # Convert single dict to list
-                data = [data]
+                # Check for single entity wrapped in a key
+                for key in single_entity_keys:
+                    if key in data and isinstance(data[key], dict):
+                        # Convert single entity to list for table display
+                        data = [data[key]]
+                        break
+                else:
+                    # If no known key found, find first key with a list value
+                    for key, value in data.items():
+                        if isinstance(value, list) and key != "pagination":
+                            data = value
+                            break
+                    else:
+                        # No list found, convert single dict to list
+                        data = [data]
 
         if not isinstance(data, list) or not data:
             return "No data to display"
+
+        # Filter to essential columns for better readability
+        data = self._filter_essential_columns(data)
 
         if RICH_AVAILABLE and self.console:
             return self._format_rich_table(data)
@@ -322,6 +348,76 @@ class Formatter:
                     lines.append(f"{prefix}├─ [{i}]: {item}")
 
         return "\n".join(lines)
+
+    def _filter_essential_columns(self, data: List[Dict]) -> List[Dict]:
+        """Filter data to show only essential columns for better readability.
+
+        Args:
+            data: List of dictionaries
+
+        Returns:
+            Filtered list with only essential columns
+        """
+        if not data:
+            return data
+
+        # Detect data type based on keys in first item
+        first_item = data[0]
+        
+        # Define essential columns for different entity types
+        essential_columns = {
+            # Agents
+            "agent": ["id", "name", "status", "model_name", "total_conversations", "total_messages", "created_at"],
+            # Documents
+            "document": ["id", "original_filename", "status", "word_count", "document_type", "created_at"],
+            # Database connections
+            "database": ["id", "name", "database_type", "host", "status", "created_at"],
+            # Conversations
+            "conversation": ["id", "title", "agent_id", "status", "message_count", "created_at"],
+            # Leads
+            "lead": ["id", "name", "email", "phone", "status", "source", "created_at"],
+            # Companies
+            "company": ["id", "name", "status", "subscription_tier", "created_at"],
+            # Users
+            "user": ["id", "username", "email", "role", "status", "last_login"],
+        }
+
+        # Detect entity type
+        entity_type = None
+        if "model_name" in first_item or "llm_settings_id" in first_item:
+            entity_type = "agent"
+        elif "original_filename" in first_item or "document_type" in first_item:
+            entity_type = "document"
+        elif "database_type" in first_item or "host" in first_item:
+            entity_type = "database"
+        elif "message_count" in first_item or "agent_id" in first_item:
+            entity_type = "conversation"
+        elif "subscription_tier" in first_item or "company_name" in first_item:
+            entity_type = "company"
+        elif "username" in first_item and "role" in first_item:
+            entity_type = "user"
+        elif "source" in first_item and "email" in first_item:
+            entity_type = "lead"
+
+        # If entity type detected, filter columns
+        if entity_type and entity_type in essential_columns:
+            columns = essential_columns[entity_type]
+            filtered_data = []
+            for item in data:
+                filtered_item = {k: v for k, v in item.items() if k in columns}
+                filtered_data.append(filtered_item)
+            return filtered_data
+
+        # If too many columns (>10), show only first 10
+        if len(first_item) > 10:
+            keys_to_show = list(first_item.keys())[:10]
+            filtered_data = []
+            for item in data:
+                filtered_item = {k: v for k, v in item.items() if k in keys_to_show}
+                filtered_data.append(filtered_item)
+            return filtered_data
+
+        return data
 
     @staticmethod
     def _format_header(key: str) -> str:

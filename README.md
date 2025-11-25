@@ -14,7 +14,7 @@ The CLI has been significantly improved with user-friendly features:
 - **⚡ Quick Commands**: Update agents without complex JSON payloads
 - **💡 Better Errors**: Meaningful messages with helpful suggestions
 
-**See [ENHANCEMENT_SUMMARY.md](ENHANCEMENT_SUMMARY.md) for details and [USER_GUIDE.md](USER_GUIDE.md) for comprehensive examples.**
+**See [ENHANCEMENT_SUMMARY.md](ENHANCEMENT_SUMMARY.md) for details, [USER_GUIDE.md](USER_GUIDE.md) for comprehensive examples, and [PYTHON_SDK_EXAMPLES.md](PYTHON_SDK_EXAMPLES.md) for Python code examples.**
 
 ## Table of Contents
 

@@ -9,17 +9,6 @@ The Knowrithm CLI is a powerful command-line interface for managing your Knowrit
 ```bash
 # Install from source
 cd knowrithm-cli
-pip install -e .
-
-# Or install from PyPI (when published)
-pip install knowrithm-cli
-```
-
-## Quick Start
-
-### 1. Configure the CLI
-
-```bash
 # Set your API base URL
 knowrithm config set-base-url https://app.knowrithm.org/api
 

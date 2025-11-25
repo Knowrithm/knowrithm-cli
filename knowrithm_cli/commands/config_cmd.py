@@ -7,7 +7,8 @@ import json
 import click
 
 from .. import config
-from ..utils import print_json
+from ..core.formatters import format_output
+from .common import format_option, make_client
 
 
 @click.group(name="config")
@@ -16,14 +17,15 @@ def cmd() -> None:
 
 
 @cmd.command("show")
-def show_config() -> None:
+@format_option()
+def show_config(format: str) -> None:
     """Display the current configuration with sensitive values masked."""
     cfg = config.load_config()
     safe_cfg = json.loads(json.dumps(cfg))  # deep copy
     api_secret = safe_cfg.get("auth", {}).get("api_key", {}).get("secret")
     if api_secret:
         safe_cfg["auth"]["api_key"]["secret"] = "***"
-    print_json(safe_cfg)
+    click.echo(format_output(safe_cfg, format))
 
 
 @cmd.command("set-base-url")
@@ -53,4 +55,3 @@ def set_verify_ssl(enabled: bool) -> None:
 def show_path() -> None:
     """Print the path to the configuration file."""
     click.echo(str(config.CONFIG_FILE))
-

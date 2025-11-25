@@ -88,17 +88,23 @@ class NameResolver:
             if cached_id:
                 return cached_id
 
-        # Query API
+        # Query API - list all agents and find by name
         try:
             response = self.client.get(
-                f"/api/v1/agent/by-name/{name_or_id}",
+                "/api/v1/agent",
+                params={"per_page": 100},
                 require_auth=True,
             )
-            if response and "id" in response:
-                agent_id = response["id"]
-                agent_name = response.get("name", name_or_id)
-                self._update_cache("agents", agent_name, agent_id)
-                return agent_id
+            # Handle different response structures
+            agents = response.get("agents", []) or response.get("data", [])
+            
+            # Search for exact match (case-insensitive)
+            for agent in agents:
+                agent_name = agent.get("name", "")
+                if agent_name.lower() == name_or_id.lower():
+                    agent_id = agent["id"]
+                    self._update_cache("agents", agent_name, agent_id)
+                    return agent_id
         except Exception:
             pass
 

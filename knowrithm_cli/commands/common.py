@@ -28,6 +28,21 @@ def auth_option(help_text: Optional[str] = None):
     return decorator
 
 
+def format_option(default: str = "table"):
+    """Reusable click option for choosing output format."""
+
+    def decorator(func):
+        return click.option(
+            "--format",
+            type=click.Choice(["json", "table", "csv", "yaml", "tree"]),
+            default=default,
+            show_default=True,
+            help="Output format for the response.",
+        )(func)
+
+    return decorator
+
+
 def make_client(**kwargs: Any) -> KnowrithmClient:
     """Instantiate the API client."""
     return KnowrithmClient(**kwargs)

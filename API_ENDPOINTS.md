@@ -1,0 +1,662 @@
+# API Endpoint Reference
+
+This document summarizes the available Flask blueprint routes, their primary request requirements, and the headers needed for authentication. Most write operations expect JSON payloads—send them with `Content-Type: application/json`. File uploads explicitly mention multipart form data.
+
+## Authentication Overview
+
+- **JWT access tokens**: Include `Authorization: Bearer <token>`. Role-specific decorators (e.g., admin or super-admin) still apply.
+- **API key authentication**: Provide both `X-API-Key` and `X-API-Secret`. Many routes also require specific scopes (for example `read`, `write`, or `admin`).
+- Unless a route explicitly states “Headers: none”, assume one of the above authentication methods is required. When both options are listed, either credential type works.
+
+---
+
+## Address (`app/blueprints/address/routes.py`)
+
+- `GET /v1/address-seed`
+  - Purpose: Populate countries, states, and cities with seed data.
+  - Headers: none.
+  - Body: none.
+- `POST /v1/country`
+  - Purpose: Create a country.
+  - Headers: `Authorization: Bearer <JWT>` (admin role).
+  - Body: `{ "name": string (required), "iso_code": string (optional) }`.
+- `GET /v1/country`
+  - Purpose: List countries.
+  - Headers: none.
+  - Body: none.
+- `GET /v1/country/<country_id>`
+  - Purpose: Retrieve details and nested states for a country.
+  - Headers: none.
+  - Body: none.
+- `PATCH /v1/country/<country_id>`
+  - Purpose: Update country name/ISO code.
+  - Headers: `Authorization: Bearer <JWT>` (admin role).
+  - Body: `{ "name": string (optional), "iso_code": string (optional) }`.
+- `POST /v1/state`
+  - Purpose: Create a state.
+  - Headers: `Authorization: Bearer <JWT>` (admin role).
+  - Body: `{ "name": string (required), "country_id": int (required) }`.
+- `GET /v1/state/country/<country_id>`
+  - Purpose: List states in a country.
+  - Headers: none.
+  - Body: none.
+- `GET /v1/state/<state_id>`
+  - Purpose: Retrieve state details with nested cities.
+  - Headers: none.
+  - Body: none.
+- `PATCH /v1/state/<state_id>`
+  - Purpose: Update state name or country reference.
+  - Headers: `Authorization: Bearer <JWT>` (admin role).
+  - Body: `{ "name": string (optional), "country_id": int (optional) }`.
+- `POST /v1/city`
+  - Purpose: Create a city.
+  - Headers: `Authorization: Bearer <JWT>` (admin role).
+  - Body: `{ "name": string (required), "state_id": int (required), "postal_code_prefix": string (optional) }`.
+- `GET /v1/city/state/<state_id>`
+  - Purpose: List cities in a state.
+  - Headers: none.
+  - Body: none.
+- `GET /v1/city/<city_id>`
+  - Purpose: Retrieve city details.
+  - Headers: none.
+  - Body: none.
+- `PATCH /v1/city/<city_id>`
+  - Purpose: Update city details.
+  - Headers: `Authorization: Bearer <JWT>` (admin role).
+  - Body: `{ "name": string (optional), "state_id": int (optional), "postal_code_prefix": string (optional) }`.
+- `POST /v1/address`
+  - Purpose: Create a company address.
+  - Headers: `Authorization: Bearer <JWT>` (admin role).
+  - Body: `{ "street_address": string, "city_id": int, "state_id": int, "country_id": int, "lat": number (optional), "lan": number (optional), "postal_code": string (optional), "is_primary": bool (optional) }`.
+- `GET /v1/address`
+  - Purpose: Retrieve the authenticated company’s address.
+  - Headers: `Authorization: Bearer <JWT>`.
+  - Body: none.
+
+---
+
+## Admin (`app/blueprints/admin/routes.py`)
+
+- `GET /v1/admin/user` and `GET /v1/super-admin/company/<company_id>/user`
+  - Purpose: List users with extensive filtering.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `admin`) or `Authorization: Bearer <JWT>` (admin/super-admin).
+  - Query: `page`, `per_page`, `status`, `role`, `email_verified`, `two_factor_enabled`, `search`, `created_after`, `created_before`, `last_login_after`, `last_login_before`, `never_logged_in`, `locked`, `high_login_attempts`, `timezone`, `language`, `include_deleted`, `only_deleted`, `sort_by`, `sort_order`.
+- `GET /v1/admin/system-metric` and `GET /v1/super-admin/company/<company_id>/system-metric`
+  - Purpose: Retrieve recent system metrics for a company.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `admin`) or `Authorization: Bearer <JWT>` (admin/super-admin).
+  - Body: none.
+- `GET /v1/admin/user/<user_id>`
+  - Purpose: Fetch user details for the current company.
+  - Headers: same as above.
+  - Body: none.
+- `GET /v1/audit-log`
+  - Purpose: List audit log entries.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `admin`).
+  - Query: `entity_type`, `event_type`, `risk_level`, `limit`, `offset`.
+- `GET /v1/config`
+  - Purpose: Read system configuration (sensitive keys only visible to super admins).
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `admin`).
+- `PATCH /v1/config`
+  - Purpose: Create or update a configuration entry.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `admin`).
+  - Body: `{ "config_key": string (required), "config_value": any (required), "config_type": string (optional), "description": string (optional), "is_sensitive": bool (optional) }`.
+- `POST /v1/user/<user_id>/force-password-reset`
+  - Purpose: Force a password reset and send notification email.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `admin`).
+  - Body: none.
+- `POST /v1/user/<user_id>/impersonate`
+  - Purpose: Start an impersonation session (super admin only).
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `admin`, role super admin).
+  - Body: none.
+- `PATCH /v1/user/<user_id>/status`
+  - Purpose: Change a user’s status.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `admin`).
+  - Body: `{ "status": string (required), "reason": string (optional) }`.
+- `PATCH /v1/user/<user_id>/role`
+  - Purpose: Update a user’s role.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `admin`, requester must be super admin).
+  - Body: `{ "role": string (required) }`.
+
+---
+
+## Agent (`app/blueprints/agent/routes.py`)
+
+- `POST /v1/agent`
+  - Purpose: Create an agent linked to company LLM settings.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`).
+  - Body: JSON with at least `name`; optional fields include `description`, `avatar_url`, `llm_settings_id`, `personality_traits`, `capabilities`, `operating_hours`, `languages`, `status`.
+- `GET /v1/agent/<agent_id>`
+  - Purpose: Retrieve agent details.
+  - Headers: none (public read).
+  - Body: none.
+- `GET /v1/agent`
+  - Purpose: List agents for a company with pagination/filtering.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Query: `company_id` (super admin only), `status`, `search`, `page`, `per_page`.
+- `PUT /v1/agent/<agent_id>`
+  - Purpose: Update agent metadata and LLM settings.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: Optional subset of `{ "llm_settings_id", "name", "description", "avatar_url", "personality_traits", "capabilities", "operating_hours", "languages", "status" }`.
+- `DELETE /v1/agent/<agent_id>`
+  - Purpose: Soft-delete an agent (requires no active conversations).
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: none.
+- `PATCH /v1/agent/<agent_id>/restore`
+  - Purpose: Restore a previously deleted agent.
+  - Headers: same as delete.
+  - Body: none.
+- `GET /v1/agent/<agent_id>/embed-code`
+  - Purpose: Retrieve embed code for the agent widget.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Body: none.
+- `POST /v1/agent/<agent_id>/test`
+  - Purpose: Run a test query against the agent.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Body: `{ "query": string (optional, default sample prompt) }`.
+- `GET /v1/agent/<agent_id>/stats`
+  - Purpose: Retrieve aggregate stats for an agent.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Body: none.
+- `POST /v1/agent/<agent_id>/clone`
+  - Purpose: Duplicate an agent configuration.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: `{ "name": string (optional), "llm_settings_id": uuid (optional) }`.
+- `GET /widget.js`
+  - Purpose: Serve the public chat widget script.
+  - Headers: none.
+  - Body: none.
+- `POST /test`
+  - Purpose: Render a test HTML page for embedding the widget.
+  - Headers: none (used internally).
+  - Body: `{ "body": string (HTML snippet required) }`.
+
+---
+
+## Auth (`app/blueprints/auth/routes.py`)
+
+- `GET /v1/auth/super-admin`
+  - Purpose: Seed the platform super admin from environment configuration.
+  - Headers: none.
+  - Body: none.
+- `POST /v1/auth/register`
+  - Purpose: Register a new admin for a company.
+  - Headers: none (public).
+  - Body: `{ "company_id": uuid, "email": string, "username": string, "password": string, "first_name": string, "last_name": string }`.
+- `POST /v1/auth/user`
+  - Purpose: Add a user under the authenticated company.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT (admin/super admin).
+  - Body: `{ "email": string, "username": string, "password": string, "first_name": string, "last_name": string, "company_id": uuid (super admin only) }`.
+- `GET /v1/user/<user_id>`
+  - Purpose: Fetch an individual user record within the company.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT (admin).
+  - Body: none.
+- `POST /v1/auth/login`
+  - Purpose: User login.
+  - Headers: none.
+  - Body: `{ "email": string, "password": string }`.
+- `GET /v1/auth/user/me`
+  - Purpose: Refresh the current user session and return profile + company.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Body: none.
+- `POST /v1/auth/logout`
+  - Purpose: Revoke the current session.
+  - Headers: `Authorization: Bearer <JWT>`.
+  - Body: none.
+- `POST /v1/send`
+  - Purpose: Send verification email.
+  - Headers: none.
+  - Body: `{ "email": string }`.
+- `POST /v1/verify`
+  - Purpose: Verify email using token.
+  - Headers: none.
+  - Body: `{ "token": string }`.
+- `POST /v1/auth/refresh`
+  - Purpose: Refresh access token using a refresh token.
+  - Headers: `Authorization: Bearer <refresh JWT>`.
+  - Body: none.
+
+---
+
+## Company (`app/blueprints/company/routes.py`)
+
+- `GET /v1/super-admin/company`
+  - Purpose: Paginated list of companies.
+  - Headers: `Authorization: Bearer <JWT>` (super admin).
+  - Query: `page`, `per_page`.
+- `GET /v1/company`
+  - Purpose: Retrieve authenticated company details.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `POST /v1/company`
+  - Purpose: Create a company via JSON or multipart form.
+  - Headers: none (typically internal use). Include `Content-Type: application/json` or `multipart/form-data`.
+  - Body: Name and email required; optional `logo`, `address_id`, `phone`.
+- `GET /v1/company/<company_id>/statistics` and `GET /v1/company/statistics`
+  - Purpose: Lead statistics.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Query: `days` (default 30).
+- `DELETE /v1/company/<company_id>`
+  - Purpose: Soft delete a company.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+- `PATCH /v1/company/<company_id>/restore`
+  - Purpose: Restore a soft-deleted company.
+  - Headers: same as delete.
+- `GET /v1/company/deleted`
+  - Purpose: List soft-deleted companies.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `DELETE /v1/company/bulk-delete`
+  - Purpose: Soft delete multiple companies.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: `{ "company_ids": [uuid, ...] }`.
+- `PATCH /v1/company/bulk-restore`
+  - Purpose: Restore multiple companies.
+  - Headers: same as bulk delete.
+  - Body: `{ "company_ids": [uuid, ...] }`.
+- `GET /v1/company/<company_id>/related-data`
+  - Purpose: (Super admin) Inspect related data counts before deletion.
+  - Headers: `Authorization: Bearer <JWT>` (super admin).
+  - Body: none.
+- `DELETE /v1/company/<company_id>/cascade-delete`
+  - Purpose: Super-admin cascade deletion flag.
+  - Headers: `Authorization: Bearer <JWT>` (super admin).
+  - Body: `{ "delete_related": bool (optional) }`.
+- `PUT /v1/company/<company_id>`
+  - Purpose: Update company details.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `admin`) or JWT (admin/super admin).
+  - Body: Any subset of `{ "name", "logo", "address_id", "email", "phone" }`.
+- `PATCH /v1/company/<company_id>`
+  - Purpose: Partial update (identical to PUT implementation).
+  - Headers: `Authorization: Bearer <JWT>` (super admin).
+
+---
+
+## Conversation (`app/blueprints/conversation/routes.py`)
+
+- `POST /v1/conversation`
+  - Purpose: Create a conversation for the authenticated entity.
+  - Headers: Either `X-API-Key` + `X-API-Secret` (scope `write`) or `Authorization: Bearer <JWT>`.
+  - Body: `{ "agent_id": uuid (required), "title": string (optional), "metadata": object (optional), "max_context_length": int (optional) }`.
+- `GET /v1/conversation`
+  - Purpose: List company conversations (active).
+  - Headers: same as above but scope `read`.
+  - Query: `page`, `per_page`.
+- `GET /v1/conversation/entity`
+  - Purpose: List conversations for the authenticated entity (user/lead).
+  - Headers: same as above (scope `read`).
+  - Query: `page`, `per_page`.
+- `GET /v1/conversation/<conversation_id>/messages`
+  - Purpose: Retrieve paginated messages for a conversation owned by the caller.
+  - Headers: same as above (scope `read`).
+  - Query: `page`, `per_page`.
+- `POST /v1/conversation/<conversation_id>/chat`
+  - Purpose: Queue a chat message for asynchronous AI processing (returns immediately with a task id).
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: `{ "message": string (required) }`.
+  - Response: `202 Accepted` with `{ status: "queued", task_id, conversation_id, message_id, poll_url }`.
+  - Real-time: WebSocket clients should emit `join_conversation` before sending messages to receive the `chat_status` / `chat_response` events automatically.
+- `GET /v1/conversation/<conversation_id>/messages/stream`
+  - Purpose: Open a Server-Sent Events (SSE) stream that pushes `queued`, `completed`, `failed`, and heartbeat events for the conversation.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Response: `200 OK` with `text/event-stream` data (see `chat_status` / `chat_response` payloads); `503` if streaming is not configured.
+- `DELETE /v1/conversation/<conversation_id>`
+  - Purpose: Soft delete a conversation and its messages.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: none.
+- `DELETE /v1/message/<message_id>`
+  - Purpose: Soft delete a single message.
+  - Headers: same as above.
+  - Body: none.
+- `DELETE /v1/conversation/<conversation_id>/messages`
+  - Purpose: Soft delete all messages for a conversation.
+  - Headers: same as above.
+  - Body: none.
+- `PATCH /v1/conversation/<conversation_id>/restore`
+  - Purpose: Restore a soft-deleted conversation.
+  - Headers: same as above.
+  - Body: none.
+- `PATCH /v1/message/<message_id>/restore`
+  - Purpose: Restore a soft-deleted message.
+  - Headers: same as above.
+  - Body: none.
+- `GET /v1/conversation/deleted`
+  - Purpose: List soft-deleted conversations.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Query: pagination via service defaults.
+- `GET /v1/message/deleted`
+  - Purpose: List soft-deleted messages.
+  - Headers: same as above.
+- `PATCH /v1/conversation/<conversation_id>/message/restore-all`
+  - Purpose: Restore every message in a conversation.
+  - Headers: same as above.
+
+---
+
+## Dashboard (`app/blueprints/dashboard/routes.py`)
+
+- `GET /v1/analytic/dashboard`
+  - Purpose: Aggregate analytics overview (documents, conversations, leads, agents, etc.).
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Query: optional `company_id` (super admin).
+- `POST /v1/search/document`
+  - Purpose: Semantic search across documents.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: `{ "query": string (required), "agent_id": uuid (required), "limit": int (optional, max 50) }`.
+- `POST /v1/search/database`
+  - Purpose: Semantic/database search.
+  - Headers: same as above.
+  - Body: `{ "query": string (required), "connection_id": uuid (optional) }`.
+- `POST /v1/system-metric`
+  - Purpose: Kick off async system metrics collection.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: none.
+- `GET /v1/analytic/agent/<agent_id>`
+  - Purpose: Detailed analytics for a single agent.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Query: `start_date`, `end_date` (ISO strings).
+- `GET /v1/analytic/conversation/<conversation_id>`
+  - Purpose: Conversation-specific analytics.
+  - Headers: same as above.
+  - Query: none (filters handled server-side).
+- `GET /v1/analytic/leads`
+  - Purpose: Lead analytics for the company.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Query: `start_date`, `end_date`, `company_id` (super admin override).
+- `GET /v1/analytic/usage`
+  - Purpose: Platform usage metrics (API calls, agent activity, etc.).
+  - Headers: same as above.
+  - Query: `start_date`, `end_date`.
+- `GET /v1/analytic/agent/<agent_id>/performance-comparison`
+  - Purpose: Compare agent metrics against company averages.
+  - Headers: same as above.
+  - Query: `start_date`, `end_date`.
+- `POST /v1/analytic/export`
+  - Purpose: Export analytics data (conversations, leads, agents, usage) in JSON/CSV.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Body: `{ "type": "conversations"|"leads"|"agents"|"usage", "format": "json"|"csv", "start_date": iso-string (optional), "end_date": iso-string (optional) }`.
+
+---
+
+## Database (`app/blueprints/database/routes.py`)
+
+- `POST /v1/database-connection`
+  - Purpose: Create and test a database connection.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: `{ "name": string, "url": string, "database_type": string (postgres, mysql, etc.), "agent_id": uuid, "connection_params": object (optional) }`.
+- `GET /v1/database-connection`
+  - Purpose: List connections for the authenticated user.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `POST /v1/database-connection/<connection_id>/test`
+  - Purpose: Re-test a specific connection.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: none.
+- `POST /v1/database-connection/<connection_id>/analyze`
+  - Purpose: Queue semantic analysis for a database.
+  - Headers: same as above.
+  - Body: none.
+- `POST /v1/database-connection/analyze`
+  - Purpose: Batch analyze all connections (ensure to supply list if required by implementation).
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: Optional filters (see implementation/task details).
+- `GET /v1/database-connection/<connection_id>/table`
+  - Purpose: List tables for a connection.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `GET /v1/database-connection/table/<table_id>`
+  - Purpose: Retrieve table metadata.
+  - Headers: same as above.
+- `GET /v1/database-connection/<connection_id>/semantic-snapshot`
+  - Purpose: Fetch stored semantic snapshot.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `GET /v1/database-connection/<connection_id>/knowledge-graph`
+  - Purpose: Retrieve semantic knowledge graph JSON.
+  - Headers: same.
+- `GET /v1/database-connection/<connection_id>/sample-queries`
+  - Purpose: Retrieve generated sample queries.
+  - Headers: same.
+- `POST /v1/database-connection/<connection_id>/text-to-sql`
+  - Purpose: Generate SQL from natural language (optional execution).
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+  - Body: `{ "question": string (required), "execute": bool (optional), "result_limit": int (optional) }`.
+- `POST /v1/database-connection/export`
+  - Purpose: Export database content to documents.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: `{ "connection_id": uuid (required) }`.
+- `DELETE /v1/database-connection/<connection_id>`
+  - Purpose: Soft delete a connection.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: none.
+- `DELETE /v1/database-connection/table/<table_id>`
+  - Purpose: Delete a specific table metadata entry.
+  - Headers: same as above.
+- `DELETE /v1/database-connection/<connection_id>/table`
+  - Purpose: Delete all table metadata for a connection.
+  - Headers: same.
+- `PATCH /v1/database-connection/<connection_id>/restore`
+  - Purpose: Restore a soft-deleted connection.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+- `PATCH /v1/database-connection/table/<table_id>/restore`
+  - Purpose: Restore a soft-deleted table metadata record.
+  - Headers: same.
+- `GET /v1/database-connection/deleted`
+  - Purpose: List deleted connections.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `GET /v1/database-connection/table/deleted`
+  - Purpose: List deleted tables.
+  - Headers: same.
+- `PUT /v1/database-connection/<connection_id>`
+  - Purpose: Replace connection details.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: Accepts same fields as creation (name, url, database_type, connection_params, agent_id).
+- `PATCH /v1/database-connection/<connection_id>`
+  - Purpose: Partial update (subset of the PUT payload).
+  - Headers: same.
+
+---
+
+## Document (`app/blueprints/document/routes.py`)
+
+- `POST /v1/document/upload`
+  - Purpose: Upload files or scrape URLs and enqueue processing.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT; use `Content-Type: multipart/form-data` for file uploads or `application/json` for URL submission.
+  - Body: `agent_id` required. Support for `files` (multiple) and/or `url` / `urls`.
+- `GET /v1/document`
+  - Purpose: List documents for the company.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `DELETE /v1/document/<document_id>`
+  - Purpose: Soft delete a document.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+- `DELETE /v1/document/chunk/<chunk_id>`
+  - Purpose: Soft delete a single document chunk.
+  - Headers: same as above.
+- `DELETE /v1/document/<document_id>/chunk`
+  - Purpose: Delete all chunks for a document.
+  - Headers: same.
+- `PATCH /v1/document/<document_id>/restore`
+  - Purpose: Restore a soft-deleted document.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+- `PATCH /v1/document/chunk/<chunk_id>/restore`
+  - Purpose: Restore a soft-deleted chunk.
+  - Headers: same.
+- `GET /v1/document/deleted`
+  - Purpose: List deleted documents.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `GET /v1/document/chunk/deleted`
+  - Purpose: List deleted document chunks.
+  - Headers: same.
+- `PATCH /v1/document/<document_id>/chunk/restore-all`
+  - Purpose: Restore all chunks for a document.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+- `DELETE /v1/document/bulk-delete`
+  - Purpose: Bulk delete documents.
+  - Headers: same as above.
+  - Body: `{ "document_ids": [uuid, ...] }`.
+
+---
+
+## Health (`app/blueprints/health/routes.py`)
+
+- `GET /health`
+  - Purpose: Simple health check.
+  - Headers: none.
+  - Body: none.
+
+---
+
+## Lead (`app/blueprints/lead/routes.py`)
+
+- `POST /v1/lead/register`
+  - Purpose: Public lead registration with automatic JWT issuance for the widget.
+  - Headers: none (widget clients).
+  - Body: `{ "agent_id": uuid, "first_name": string, "last_name": string, "email": string, "phone": string (optional), "source": string (optional), "notes": string (optional), "consent_marketing": bool (optional), "consent_data_processing": bool (optional) }`.
+- `POST /v1/lead`
+  - Purpose: Create a lead via authenticated API.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: same structure as registration (company_id is injected from context).
+- `GET /v1/lead/<lead_id>`
+  - Purpose: Fetch lead details.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `GET /v1/lead/company`
+  - Purpose: Paginated company lead list.
+  - Headers: same as above.
+  - Query: `page`, `per_page`, `status`, `search`.
+- `PUT /v1/lead/<lead_id>`
+  - Purpose: Update lead fields.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: Any mutable lead attributes (first_name, last_name, email, phone, source, notes, status, consent flags).
+- `DELETE /v1/lead/<lead_id>`
+  - Purpose: Soft delete a lead.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+
+---
+
+## OAuth & API Keys (`app/blueprints/oauth/routes.py`)
+
+- `POST /v1/auth/api-keys`
+  - Purpose: Create an API key for the authenticated JWT user.
+  - Headers: `Authorization: Bearer <JWT>`.
+  - Body: `{ "name": string (optional), "scopes": [string] (optional), "permissions": object (optional), "expires_in_days": int (optional) }`.
+- `GET /v1/auth/api-keys`
+  - Purpose: List active API keys created by the current JWT user.
+  - Headers: `Authorization: Bearer <JWT>`.
+- `DELETE /v1/auth/api-keys/<api_key_id>`
+  - Purpose: Revoke an API key.
+  - Headers: `Authorization: Bearer <JWT>`.
+- `GET /v1/auth/validate`
+  - Purpose: Validate current credentials and return metadata.
+  - Headers: `Authorization: Bearer <JWT>`.
+- `GET /v1/overview`
+  - Purpose: High-level API key analytics.
+  - Headers: `X-API-Key`, `X-API-Secret` (scopes `read`, `admin`) or JWT (admin).
+  - Query: `days` (default 30).
+- `GET /v1/usage-trends`
+  - Purpose: Usage trend analytics.
+  - Headers: same as overview.
+  - Query: `days`, `granularity` (`daily` or `hourly`).
+- `GET /v1/top-endpoints`
+  - Purpose: Top used endpoints per company.
+  - Headers: `X-API-Key`, `X-API-Secret` (scopes `read`, `admin`) or JWT (admin).
+  - Query: `days` (optional).
+- `GET /v1/api-key-performance`
+  - Purpose: Performance metrics per API key.
+  - Headers: same as above.
+  - Query: `days` (optional).
+- `GET /v1/error-analysis`
+  - Purpose: Error distribution for API keys.
+  - Headers: same.
+  - Query: `days` (optional).
+- `GET /v1/rate-limit-analysis`
+  - Purpose: Rate limit usage insights.
+  - Headers: same.
+  - Query: `days` (optional).
+- `GET /v1/detailed-usage/<api_key_id>`
+  - Purpose: Detailed usage logs for a specific key.
+  - Headers: `X-API-Key`, `X-API-Secret` (scopes `read`, `admin`) or JWT (admin).
+  - Query: `days` (default 30).
+
+---
+
+## Profile (`app/blueprints/profile/routes.py`)
+
+- `GET /v1/user/profile`
+  - Purpose: Return the authenticated user profile.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `PUT /v1/user/profile`
+  - Purpose: Update profile details.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: Optional subset of `{ "first_name", "last_name", "timezone", "language", "preferences" }`.
+
+---
+
+## Settings (`app/blueprints/settings/routes.py`)
+
+- `POST /v1/settings`
+  - Purpose: Create LLM settings for a company or agent.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: `{ "llm_provider_id": uuid, "llm_model_id": uuid, "embedding_provider_id": uuid, "embedding_model_id": uuid, "agent_id": uuid (optional), "llm_api_key": string (optional), "llm_api_base_url": string (optional), "llm_temperature": number (optional), "llm_max_tokens": int (optional), "llm_additional_params": object (optional), "embedding_api_key": string (optional), "embedding_api_base_url": string (optional), "embedding_dimension": int (optional), "embedding_additional_params": object (optional), "widget_script_url": string (optional), "widget_config": object (optional), "is_default": bool (optional) }`.
+- `PUT /v1/settings/<settings_id>`
+  - Purpose: Update an LLM settings record.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: Any fields from the creation payload.
+- `GET /v1/settings/<settings_id>`
+  - Purpose: Fetch a specific LLM settings record.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `GET /v1/settings/company/<company_id>`
+  - Purpose: List company-level settings.
+  - Headers: same as above.
+- `GET /v1/settings/agent/<agent_id>`
+  - Purpose: List settings tied to an agent.
+  - Headers: same.
+- `DELETE /v1/settings/<settings_id>`
+  - Purpose: Delete LLM settings.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+- `POST /v1/settings/test/<settings_id>`
+  - Purpose: Validate and test an LLM settings configuration.
+  - Headers: same as above.
+  - Body: Optional override parameters depending on implementation.
+- `POST /v1/providers`
+  - Purpose: Create a provider record.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: `{ "name": string, "type": string (matches `ProviderType`), "description": string (optional), "api_base_url": string (optional), "pricing": object (optional), "status": string (optional) }`.
+- `PUT /v1/providers/<provider_id>`
+  - Purpose: Update provider metadata.
+  - Headers: same as creation.
+  - Body: Provider fields to update.
+- `DELETE /v1/providers/<provider_id>`
+  - Purpose: Delete a provider.
+  - Headers: same.
+- `GET /v1/providers`
+  - Purpose: List providers.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `GET /v1/providers/<provider_id>`
+  - Purpose: Retrieve provider details.
+  - Headers: same.
+- `POST /v1/providers/<provider_id>/models`
+  - Purpose: Create a model under a provider.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: `{ "name": string, "provider_model_id": string (optional), "type": string, "context_window": int (optional), "input_price": number (optional), "output_price": number (optional), "currency": string (optional), "embedding_dimension": int (optional), "status": string (optional) }`.
+- `PUT /v1/providers/<provider_id>/models/<model_id>`
+  - Purpose: Update provider model fields.
+  - Headers: same.
+  - Body: Any subset of model attributes.
+- `DELETE /v1/providers/<provider_id>/models/<model_id>`
+  - Purpose: Delete a provider model.
+  - Headers: same.
+- `GET /v1/providers/<provider_id>/models`
+  - Purpose: List models for a provider.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `GET /v1/providers/<provider_id>/models/<model_id>`
+  - Purpose: Retrieve a single provider model.
+  - Headers: same.
+- `GET /v1/settings/providers`
+  - Purpose: List providers with settings context.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `read`) or JWT.
+- `POST /v1/providers/bulk-import`
+  - Purpose: Bulk import providers/models definitions.
+  - Headers: `X-API-Key`, `X-API-Secret` (scope `write`) or JWT.
+  - Body: Structured bulk dataset (see swagger spec).
+- `POST /v1/settings/providers/seed`
+  - Purpose: Seed default providers/models.
+  - Headers: same as above.
+  - Body: optional overrides.
+
+---
+
+For the exact response schemas and additional validation nuances, refer to the accompanying `swagger_doc` specifications and model definitions.

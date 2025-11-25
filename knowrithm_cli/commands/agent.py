@@ -8,8 +8,8 @@ import click
 
 from ..client import KnowrithmClient
 from ..core import get_context, NameResolver, format_output
-from ..utils import load_json_payload, print_json
-from .common import auth_kwargs, auth_option, make_client
+from ..utils import load_json_payload
+from .common import auth_kwargs, auth_option, format_option, make_client
 
 
 @click.group(name="agent")
@@ -24,14 +24,7 @@ def cmd() -> None:
 @click.option("--search", help="Search string for name/description.")
 @click.option("--page", default=1, type=int, show_default=True)
 @click.option("--per-page", default=20, type=int, show_default=True)
-@click.option(
-    "--format",
-    "output_format",
-    type=click.Choice(["json", "table", "csv", "yaml"], case_sensitive=False),
-    default="table",
-    show_default=True,
-    help="Output format",
-)
+@format_option()
 def list_agents(
     auth: str,
     company_id: Optional[str],
@@ -39,7 +32,7 @@ def list_agents(
     search: Optional[str],
     page: int,
     per_page: int,
-    output_format: str,
+    format: str,
 ) -> None:
     """List agents for the authenticated company."""
     client = make_client()
@@ -57,22 +50,15 @@ def list_agents(
     response = client.get("/api/v1/agent", params=params, **auth_kwargs(auth))
     
     # Format output
-    output = format_output(response, output_format)
+    output = format_output(response, format)
     click.echo(output)
 
 
 @cmd.command("get")
 @auth_option()
 @click.argument("agent_name_or_id")
-@click.option(
-    "--format",
-    "output_format",
-    type=click.Choice(["json", "table", "tree", "yaml"], case_sensitive=False),
-    default="json",
-    show_default=True,
-    help="Output format",
-)
-def get_agent(auth: str, agent_name_or_id: str, output_format: str) -> None:
+@format_option(default="json")
+def get_agent(auth: str, agent_name_or_id: str, format: str) -> None:
     """Retrieve a specific agent by name or ID."""
     client = make_client()
     resolver = NameResolver(client)
@@ -86,15 +72,16 @@ def get_agent(auth: str, agent_name_or_id: str, output_format: str) -> None:
     response = client.get(f"/api/v1/agent/{agent_id}", **auth_kwargs(auth))
     
     # Format output
-    if output_format == "tree":
-        output = format_output(response, output_format, title=f"Agent: {agent_name_or_id}")
+    if format == "tree":
+        output = format_output(response, format, title=f"Agent: {agent_name_or_id}")
     else:
-        output = format_output(response, output_format)
+        output = format_output(response, format)
     click.echo(output)
 
 
 @cmd.command("create")
 @auth_option()
+@format_option()
 @click.option("--payload", help="JSON string or @path describing the agent.")
 @click.option("--name", help="Agent name (interactive mode)")
 @click.option("--description", help="Agent description (interactive mode)")
@@ -102,6 +89,7 @@ def get_agent(auth: str, agent_name_or_id: str, output_format: str) -> None:
 @click.option("--interactive", "-i", is_flag=True, help="Interactive creation mode")
 def create_agent(
     auth: str,
+    format: str,
     payload: Optional[str],
     name: Optional[str],
     description: Optional[str],
@@ -153,12 +141,54 @@ def create_agent(
         response = client.handle_async_response(response, wait=wait)
     
     # Set as active agent if successful
-    if response.get("id"):
+    if response.get("agent"):
+        agent = response["agent"]
+        agent_id = agent.get("id")
+        agent_name = agent.get("name")
+        
+        if agent_id:
+            ctx = get_context()
+            ctx.set_agent(agent_id, agent_name)
+        
+        # Display friendly success message
+        click.echo("\n✅ Agent created successfully!\n")
+        click.echo(f"  Name: {agent_name}")
+        click.echo(f"  ID: {agent_id}")
+        click.echo(f"  Status: {agent.get('status', 'N/A')}")
+        click.echo(f"  Model: {agent.get('model_name', 'N/A')}")
+        
+        # Show LLM settings info if available
+        if response.get("settings"):
+            settings = response["settings"]
+            click.echo(f"\n  LLM Provider: {settings.get('llm_provider_label', 'N/A')}")
+            click.echo(f"  LLM Model: {settings.get('llm_model_name', 'N/A')}")
+            click.echo(f"  Embedding Provider: {settings.get('embedding_provider_label', 'N/A')}")
+            click.echo(f"  Embedding Model: {settings.get('embedding_model_name', 'N/A')}")
+        
+        click.echo(f"\n  🔗 Set as active agent")
+        
+        # Show full details if format is not table
+        if format != "table":
+            click.echo(f"\n{'-' * 50}")
+            click.echo("Full Details:")
+            click.echo(format_output(response, format))
+    elif response.get("id"):
+        # Fallback for older response format
+        agent_id = response.get("id")
+        agent_name = response.get("name")
+        
         ctx = get_context()
-        ctx.set_agent(response["id"], response.get("name"))
-        click.echo(f"✓ Agent created and set as active: {response.get('name')}", err=True)
-    
-    print_json(response)
+        ctx.set_agent(agent_id, agent_name)
+        
+        click.echo(f"\n✅ Agent created: {agent_name}")
+        click.echo(f"  ID: {agent_id}")
+        click.echo(f"  Set as active agent")
+        
+        if format != "table":
+            click.echo(f"\n{format_output(response, format)}")
+    else:
+        # Show raw response if structure is unexpected
+        click.echo(format_output(response, format))
 
 
 def _interactive_agent_creation() -> dict:
@@ -168,8 +198,164 @@ def _interactive_agent_creation() -> dict:
     name = click.prompt("Agent name", type=str)
     description = click.prompt("Description", default="", show_default=False)
     
+    # Fetch providers from API
+    client = make_client()
+    
+    # Variables to store IDs
+    llm_provider_id = None
+    llm_model_id = None
+    embedding_provider_id = None
+    embedding_model_id = None
+    
+    try:
+        providers_response = client.get("/api/v1/providers", require_auth=True)
+        all_providers = providers_response.get("providers", [])
+    except Exception as e:
+        click.echo(f"❌ Error: Could not fetch providers from API: {e}")
+        click.echo("Cannot create agent without provider information.")
+        raise click.Abort()
+    
+    if not all_providers:
+        click.echo("❌ Error: No providers found in the system.")
+        click.echo("Please configure providers first using the settings API.")
+        raise click.Abort()
+    
+    # Filter providers by provider_type
+    llm_providers = [p for p in all_providers if p.get("provider_type") in ["llm", "both"]]
+    embedding_providers = [p for p in all_providers if p.get("provider_type") in ["embedding", "both"]]
+    
+    # LLM Provider Selection
+    click.echo("\n📋 Select LLM Provider:")
+    if not llm_providers:
+        click.echo("❌ Error: No LLM providers found.")
+        raise click.Abort()
+    
+    for idx, provider in enumerate(llm_providers, 1):
+        provider_name = provider.get("label", "Unknown")
+        provider_type = provider.get("provider_type", "N/A")
+        click.echo(f"  {idx}. {provider_name} ({provider_type})")
+    
+    provider_idx = click.prompt(
+        "\nSelect LLM provider (number)",
+        type=click.IntRange(1, len(llm_providers)),
+        default=1
+    )
+    
+    selected_llm_provider = llm_providers[provider_idx - 1]
+    llm_provider = selected_llm_provider.get("label")
+    llm_provider_id = selected_llm_provider.get("id")
+    
+    # Fetch models for selected provider
+    try:
+        models_response = client.get(
+            f"/api/v1/providers/{llm_provider_id}/models",
+            require_auth=True
+        )
+        llm_models = models_response.get("models", [])
+        # Filter for LLM models
+        llm_models = [m for m in llm_models if m.get("model_type") in ["llm", "chat", "completion"]]
+    except Exception as e:
+        click.echo(f"❌ Error: Could not fetch models: {e}")
+        raise click.Abort()
+    
+    if not llm_models:
+        click.echo(f"❌ Error: No LLM models found for {llm_provider}")
+        raise click.Abort()
+    
+    click.echo(f"\n🤖 Available Models for {llm_provider}:")
+    for idx, model in enumerate(llm_models, 1):
+        model_name = model.get("name", model.get("label", "Unknown"))
+        context = model.get("context_window", "N/A")
+        click.echo(f"  {idx}. {model_name} (context: {context})")
+    
+    model_idx = click.prompt(
+        "\nSelect LLM model (number)",
+        type=click.IntRange(1, len(llm_models)),
+        default=1
+    )
+    
+    selected_llm_model = llm_models[model_idx - 1]
+    llm_model = selected_llm_model.get("name", selected_llm_model.get("label", "Unknown"))
+    llm_model_id = selected_llm_model.get("id")
+    
+    click.echo(f"\n✓ LLM: {llm_provider} / {llm_model}")
+    
+    # Embedding Provider Selection
+    click.echo("\n📋 Select Embedding Provider:")
+    click.echo("  (You can use the same provider or choose a different one)")
+    
+    if not embedding_providers:
+        click.echo("❌ Error: No embedding providers found.")
+        raise click.Abort()
+    
+    for idx, provider in enumerate(embedding_providers, 1):
+        provider_name = provider.get("label", "Unknown")
+        provider_type = provider.get("provider_type", "N/A")
+        click.echo(f"  {idx}. {provider_name} ({provider_type})")
+    
+    embedding_provider_idx = click.prompt(
+        "\nSelect embedding provider (number)",
+        type=click.IntRange(1, len(embedding_providers)),
+        default=1
+    )
+    
+    selected_embedding_provider = embedding_providers[embedding_provider_idx - 1]
+    embedding_provider = selected_embedding_provider.get("label")
+    embedding_provider_id = selected_embedding_provider.get("id")
+    
+    # Fetch models for selected embedding provider
+    try:
+        embedding_models_response = client.get(
+            f"/api/v1/providers/{embedding_provider_id}/models",
+            require_auth=True
+        )
+        embedding_models = embedding_models_response.get("models", [])
+        # Filter for embedding models
+        embedding_models = [m for m in embedding_models if m.get("model_type") == "embedding"]
+    except Exception as e:
+        click.echo(f"❌ Error: Could not fetch embedding models: {e}")
+        raise click.Abort()
+    
+    if not embedding_models:
+        click.echo(f"❌ Error: No embedding models found for {embedding_provider}")
+        raise click.Abort()
+    
+    click.echo(f"\n🔤 Available Embedding Models for {embedding_provider}:")
+    for idx, model in enumerate(embedding_models, 1):
+        model_name = model.get("name", model.get("label", "Unknown"))
+        dimension = model.get("embedding_dimension", "N/A")
+        click.echo(f"  {idx}. {model_name} (dimension: {dimension})")
+    
+    embedding_model_idx = click.prompt(
+        "\nSelect embedding model (number)",
+        type=click.IntRange(1, len(embedding_models)),
+        default=1
+    )
+    
+    selected_embedding_model = embedding_models[embedding_model_idx - 1]
+    embedding_model = selected_embedding_model.get("name", selected_embedding_model.get("label", "Unknown"))
+    embedding_model_id = selected_embedding_model.get("id")
+    
+    click.echo(f"\n✓ Embeddings: {embedding_provider} / {embedding_model}")
+    
+    # Optional API keys
+    llm_api_key = None
+    embedding_api_key = None
+    
+    if click.confirm("\nDo you want to provide API keys?", default=False):
+        llm_api_key = click.prompt(f"Enter API key for {llm_provider} (leave empty to skip)", default="", show_default=False)
+        if not llm_api_key:
+            llm_api_key = None
+        
+        if embedding_provider_id != llm_provider_id:
+            embedding_api_key = click.prompt(f"Enter API key for {embedding_provider} (leave empty to skip)", default="", show_default=False)
+            if not embedding_api_key:
+                embedding_api_key = None
+        else:
+            embedding_api_key = llm_api_key
+    
     # Optional fields
-    if click.confirm("Configure advanced settings?", default=False):
+    if click.confirm("\nConfigure advanced settings?", default=False):
         status = click.prompt(
             "Status",
             type=click.Choice(["active", "inactive", "training"], case_sensitive=False),
@@ -204,13 +390,30 @@ def _interactive_agent_creation() -> dict:
         body = {
             "name": name,
             "description": description,
+            "status": "active",  # Default status
         }
+    
+    
+    
+    # Add provider/model IDs and API keys directly to agent body
+    # The agent creation endpoint will handle creating LLM settings internally
+    body["llm_provider_id"] = llm_provider_id
+    body["llm_model_id"] = llm_model_id
+    body["embedding_provider_id"] = embedding_provider_id
+    body["embedding_model_id"] = embedding_model_id
+    
+    if llm_api_key:
+        body["llm_api_key"] = llm_api_key
+    if embedding_api_key:
+        body["embedding_api_key"] = embedding_api_key
     
     return body
 
 
+
 @cmd.command("update")
 @auth_option()
+@format_option()
 @click.argument("agent_name_or_id")
 @click.option("--payload", help="JSON string or @path with update fields.")
 @click.option("--name", help="New agent name")
@@ -219,6 +422,7 @@ def _interactive_agent_creation() -> dict:
 @click.option("--wait/--no-wait", default=True, show_default=True)
 def update_agent(
     auth: str,
+    format: str,
     agent_name_or_id: str,
     payload: Optional[str],
     name: Optional[str],
@@ -270,15 +474,16 @@ def update_agent(
         response = client.handle_async_response(response, wait=wait)
     
     click.echo("✓ Agent updated successfully", err=True)
-    print_json(response)
+    click.echo(format_output(response, format))
 
 
 @cmd.command("delete")
 @auth_option()
+@format_option()
 @click.argument("agent_name_or_id")
 @click.option("--wait/--no-wait", default=False, show_default=True)
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
-def delete_agent(auth: str, agent_name_or_id: str, wait: bool, yes: bool) -> None:
+def delete_agent(auth: str, format: str, agent_name_or_id: str, wait: bool, yes: bool) -> None:
     """Soft delete an agent by name or ID."""
     client = make_client()
     resolver = NameResolver(client)
@@ -300,14 +505,15 @@ def delete_agent(auth: str, agent_name_or_id: str, wait: bool, yes: bool) -> Non
         response = client.handle_async_response(response, wait=wait)
     
     click.echo(f"✓ Agent '{agent_name_or_id}' deleted successfully", err=True)
-    print_json(response)
+    click.echo(format_output(response, format))
 
 
 @cmd.command("restore")
 @auth_option()
+@format_option()
 @click.argument("agent_name_or_id")
 @click.option("--wait/--no-wait", default=False, show_default=True)
-def restore_agent(auth: str, agent_name_or_id: str, wait: bool) -> None:
+def restore_agent(auth: str, format: str, agent_name_or_id: str, wait: bool) -> None:
     """Restore a soft-deleted agent by name or ID."""
     client = make_client()
     resolver = NameResolver(client)
@@ -324,21 +530,14 @@ def restore_agent(auth: str, agent_name_or_id: str, wait: bool) -> None:
         response = client.handle_async_response(response, wait=wait)
     
     click.echo(f"✓ Agent '{agent_name_or_id}' restored successfully", err=True)
-    print_json(response)
+    click.echo(format_output(response, format))
 
 
 @cmd.command("stats")
 @auth_option()
 @click.argument("agent_name_or_id", required=False)
-@click.option(
-    "--format",
-    "output_format",
-    type=click.Choice(["json", "table", "tree"], case_sensitive=False),
-    default="tree",
-    show_default=True,
-    help="Output format",
-)
-def agent_stats(auth: str, agent_name_or_id: Optional[str], output_format: str) -> None:
+@format_option(default="tree")
+def agent_stats(auth: str, agent_name_or_id: Optional[str], format: str) -> None:
     """Retrieve statistics for an agent.
     
     If no agent is specified, uses the active agent from context.
@@ -366,21 +565,23 @@ def agent_stats(auth: str, agent_name_or_id: Optional[str], output_format: str) 
     response = client.get(f"/api/v1/agent/{agent_id}/stats", **auth_kwargs(auth))
     
     # Format output
-    if output_format == "tree":
-        output = format_output(response, output_format, title=f"Stats: {agent_name_or_id}")
+    if format == "tree":
+        output = format_output(response, format, title=f"Stats: {agent_name_or_id}")
     else:
-        output = format_output(response, output_format)
+        output = format_output(response, format)
     click.echo(output)
 
 
 @cmd.command("test")
 @auth_option()
+@format_option()
 @click.argument("agent_name_or_id", required=False)
 @click.option("--query", "-q", help="Test query to send to the agent")
 @click.option("--payload", help="Optional JSON test payload")
 @click.option("--wait/--no-wait", default=True, show_default=True)
 def test_agent(
     auth: str,
+    format: str,
     agent_name_or_id: Optional[str],
     query: Optional[str],
     payload: Optional[str],
@@ -436,17 +637,19 @@ def test_agent(
     if response.get("task_id"):
         response = client.handle_async_response(response, wait=wait)
     
-    print_json(response)
+    click.echo(format_output(response, format))
 
 
 @cmd.command("clone")
 @auth_option()
+@format_option()
 @click.argument("agent_name_or_id")
 @click.option("--new-name", help="Name for the cloned agent")
 @click.option("--payload", help="Optional JSON overrides for the cloned agent")
 @click.option("--wait/--no-wait", default=True, show_default=True)
 def clone_agent(
     auth: str,
+    format: str,
     agent_name_or_id: str,
     new_name: Optional[str],
     payload: Optional[str],
@@ -486,13 +689,14 @@ def clone_agent(
         response = client.handle_async_response(response, wait=wait)
     
     click.echo(f"✓ Agent cloned successfully", err=True)
-    print_json(response)
+    click.echo(format_output(response, format))
 
 
 @cmd.command("embed-code")
 @auth_option()
+@format_option()
 @click.argument("agent_name_or_id", required=False)
-def embed_code(auth: str, agent_name_or_id: Optional[str]) -> None:
+def embed_code(auth: str, format: str, agent_name_or_id: Optional[str]) -> None:
     """Fetch widget embed code for an agent.
     
     If no agent is specified, uses the active agent from context.
@@ -524,4 +728,4 @@ def embed_code(auth: str, agent_name_or_id: Optional[str]) -> None:
         click.echo(response["embed_code"])
         click.echo("\n=========================\n")
     
-    print_json(response)
+    click.echo(format_output(response, format))

@@ -55,7 +55,7 @@ class KnowrithmClient:
         self,
         *,
         headers: Optional[Dict[str, str]] = None,
-        use_jwt: bool = True,
+        use_jwt: bool = False,
         use_api_key: bool = False,
     ) -> Dict[str, str]:
         headers = {**(headers or {})}
@@ -101,15 +101,28 @@ class KnowrithmClient:
         data: Optional[Any] = None,
         files: Optional[Any] = None,
         headers: Optional[Dict[str, str]] = None,
-        use_jwt: bool = True,
-        use_api_key: bool = False,
+        use_jwt: Optional[bool] = None,
+        use_api_key: Optional[bool] = None,
         require_auth: bool = True,
         timeout: Optional[int] = None,
     ) -> requests.Response:
-        if require_auth and not (use_jwt or use_api_key):
-            # Default to JWT if available, otherwise API key.
-            use_jwt = bool(self.jwt_tokens.get("access_token"))
-            use_api_key = not use_jwt
+        # Auto-detect authentication method if not explicitly specified
+        if require_auth and (use_jwt is None or use_api_key is None):
+            # Default to JWT if available, otherwise API key
+            has_jwt = bool(self.jwt_tokens.get("access_token"))
+            has_api_key = bool(self.api_credentials.get("key") and self.api_credentials.get("secret"))
+            
+            if use_jwt is None:
+                use_jwt = has_jwt
+            if use_api_key is None:
+                use_api_key = not has_jwt and has_api_key
+            
+            # Raise error if authentication is required but no credentials are available
+            if require_auth and not (use_jwt or use_api_key):
+                raise click.ClickException(
+                    "Authentication required but no credentials configured. "
+                    "Use 'knowrithm auth login' or 'knowrithm auth set-api-key'."
+                )
         headers = self._prepare_headers(headers=headers, use_jwt=use_jwt, use_api_key=use_api_key)
         url = self._build_url(path)
         response = requests.request(

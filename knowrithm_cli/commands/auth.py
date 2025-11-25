@@ -8,8 +8,9 @@ import click
 
 from .. import config
 from ..client import KnowrithmClient
-from ..utils import load_json_payload, print_json
-from .common import auth_kwargs, auth_option, make_client
+from ..core.formatters import format_output
+from ..utils import load_json_payload
+from .common import auth_kwargs, auth_option, format_option, make_client
 
 
 @click.group(name="auth")
@@ -40,6 +41,7 @@ def _extract_tokens(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 @cmd.command("login")
+@format_option()
 @click.option("--email", prompt=True, help="User email.")
 @click.option(
     "--password",
@@ -49,7 +51,7 @@ def _extract_tokens(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     help="Account password.",
 )
 @click.option("--wait/--no-wait", default=True, help="Wait for async task responses.")
-def login(email: str, password: str, wait: bool) -> None:
+def login(email: str, password: str, wait: bool, format: str) -> None:
     """Authenticate with email/password and cache JWT tokens."""
     client = make_client()
     payload = {"email": email, "password": password}
@@ -64,21 +66,23 @@ def login(email: str, password: str, wait: bool) -> None:
     tokens = _extract_tokens(response)
     if tokens:
         _store_tokens(tokens)
-    print_json(response)
+    click.echo(format_output(response, format))
 
 
 @cmd.command("logout")
-def logout() -> None:
+@format_option()
+def logout(format: str) -> None:
     """Revoke the current session and clear cached tokens."""
     client = make_client()
     response = client.post("/api/v1/auth/logout")
     config.clear_jwt_tokens()
     click.secho("Logged out and cleared cached tokens.", fg="green")
-    print_json(response)
+    click.echo(format_output(response, format))
 
 
 @cmd.command("refresh")
-def refresh_tokens() -> None:
+@format_option()
+def refresh_tokens(format: str) -> None:
     """Refresh the access token using the cached refresh token."""
     tokens = config.get_jwt_tokens()
     refresh_token = tokens.get("refresh_token")
@@ -96,12 +100,13 @@ def refresh_tokens() -> None:
     tokens = _extract_tokens(response) or response
     if tokens:
         _store_tokens(tokens)
-    print_json(response)
+    click.echo(format_output(response, format))
 
 
 @cmd.command("register")
+@format_option()
 @click.option("--payload", help="JSON string or @path to describe the new admin user.")
-def register(payload: Optional[str]) -> None:
+def register(payload: Optional[str], format: str) -> None:
     """Register a new company admin account (public endpoint)."""
     body = load_json_payload(payload)
     if not isinstance(body, dict):
@@ -113,16 +118,17 @@ def register(payload: Optional[str]) -> None:
         require_auth=False,
         use_jwt=False,
     )
-    print_json(response)
+    click.echo(format_output(response, format))
 
 
 @cmd.command("me")
 @auth_option()
-def me(auth: str) -> None:
+@format_option()
+def me(auth: str, format: str) -> None:
     """Return details for the authenticated user."""
     client = make_client()
     response = client.get("/api/v1/auth/user/me", **auth_kwargs(auth))
-    print_json(response)
+    click.echo(format_output(response, format))
 
 
 @cmd.command("set-api-key")
@@ -157,9 +163,9 @@ def clear(clear_all: bool, tokens: bool, clear_api: bool) -> None:
 
 @cmd.command("validate")
 @auth_option()
-def validate(auth: str) -> None:
+@format_option()
+def validate(auth: str, format: str) -> None:
     """Validate current credentials with the backend."""
     client = make_client()
     response = client.get("/api/v1/auth/validate", **auth_kwargs(auth))
-    print_json(response)
-
+    click.echo(format_output(response, format))

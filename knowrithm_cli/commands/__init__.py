@@ -19,6 +19,7 @@ def register(cli: click.Group) -> None:
 
 def _load_groups() -> Iterable[click.Group]:
     from . import (
+        admin,
         analytics,
         agent,
         auth,
@@ -48,5 +49,6 @@ def _load_groups() -> Iterable[click.Group]:
         analytics.cmd,
         website.cmd,
         system.cmd,
+        admin.cmd,
     )
 
