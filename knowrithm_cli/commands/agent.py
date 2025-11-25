@@ -473,8 +473,86 @@ def update_agent(
             click.echo("Updating agent...")
         response = client.handle_async_response(response, wait=wait)
     
-    click.echo("✓ Agent updated successfully", err=True)
-    click.echo(format_output(response, format))
+    
+    # Display friendly success message
+    click.echo("\n✅ Agent updated successfully!\n")
+    
+    # Extract agent data from response - handle various response structures
+    agent_data = None
+    
+    # Check if response has a "data" field (common API response format)
+    if "data" in response:
+        data_field = response["data"]
+        if isinstance(data_field, str):
+            try:
+                parsed_data = json.loads(data_field)
+                agent_data = parsed_data.get("agent")
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        elif isinstance(data_field, dict):
+            agent_data = data_field.get("agent") or data_field
+    
+    # Fallback to other common structures
+    if not agent_data:
+        agent_data = response.get("agent")
+    
+    # Final fallback - if response itself looks like agent data
+    if not agent_data and isinstance(response, dict) and "id" in response and "name" in response:
+        agent_data = response
+    
+    if isinstance(agent_data, dict) and agent_data.get("id"):
+        # Display key agent information in a clean format
+        click.echo(f"  📝 Name: {agent_data.get('name', 'N/A')}")
+        click.echo(f"  🆔 ID: {agent_data.get('id', 'N/A')}")
+        
+        if agent_data.get("status"):
+            status_emoji = "✅" if agent_data.get("status") == "active" else "⏸️"
+            click.echo(f"  {status_emoji} Status: {agent_data.get('status')}")
+        
+        if agent_data.get("description"):
+            # Truncate long descriptions
+            desc = agent_data.get("description")
+            if len(desc) > 100:
+                desc = desc[:97] + "..."
+            click.echo(f"  📄 Description: {desc}")
+        
+        if agent_data.get("model_name"):
+            click.echo(f"  🤖 Model: {agent_data.get('model_name')}")
+        
+        # Show timestamps
+        if agent_data.get("created_at"):
+            click.echo(f"  📅 Created: {agent_data.get('created_at')}")
+        if agent_data.get("updated_at"):
+            click.echo(f"  🔄 Updated: {agent_data.get('updated_at')}")
+        
+        # Show statistics if available
+        stats_shown = False
+        if agent_data.get("total_conversations") is not None:
+            if not stats_shown:
+                click.echo("")  # Add spacing before stats
+                stats_shown = True
+            click.echo(f"  💬 Conversations: {agent_data.get('total_conversations', 0)}")
+        if agent_data.get("total_messages") is not None:
+            if not stats_shown:
+                click.echo("")
+                stats_shown = True
+            click.echo(f"  📨 Messages: {agent_data.get('total_messages', 0)}")
+        if agent_data.get("average_rating") is not None and agent_data.get("average_rating") > 0:
+            if not stats_shown:
+                click.echo("")
+                stats_shown = True
+            click.echo(f"  ⭐ Rating: {agent_data.get('average_rating', 0):.1f}")
+        
+        # Show full details if format is json or yaml
+        if format in ["json", "yaml"]:
+            click.echo(f"\n{'-' * 60}")
+            click.echo("📋 Full Response Details:")
+            click.echo('-' * 60)
+            click.echo(format_output(response, format))
+    else:
+        # Fallback to standard formatting if we can't parse the structure
+        click.echo("  ℹ️  Response received but structure is unexpected")
+        click.echo(f"\n{format_output(response, format)}")
 
 
 @cmd.command("delete")
@@ -504,8 +582,19 @@ def delete_agent(auth: str, format: str, agent_name_or_id: str, wait: bool, yes:
     if response.get("task_id"):
         response = client.handle_async_response(response, wait=wait)
     
-    click.echo(f"✓ Agent '{agent_name_or_id}' deleted successfully", err=True)
-    click.echo(format_output(response, format))
+    # Display friendly success message
+    click.echo(f"\n✅ Agent '{agent_name_or_id}' deleted successfully!\n")
+    
+    # Show message from response if available
+    if response.get("message"):
+        click.echo(f"  ℹ️  {response.get('message')}")
+    
+    # Show full details if format is json or yaml
+    if format in ["json", "yaml"]:
+        click.echo(f"\n{'-' * 60}")
+        click.echo("📋 Full Response Details:")
+        click.echo('-' * 60)
+        click.echo(format_output(response, format))
 
 
 @cmd.command("restore")
@@ -688,8 +777,56 @@ def clone_agent(
             click.echo("Cloning agent...")
         response = client.handle_async_response(response, wait=wait)
     
-    click.echo(f"✓ Agent cloned successfully", err=True)
-    click.echo(format_output(response, format))
+    # Display friendly success message
+    click.echo("\n✅ Agent cloned successfully!\n")
+    
+    # Extract agent data from response
+    agent_data = None
+    if "data" in response:
+        data_field = response["data"]
+        if isinstance(data_field, str):
+            try:
+                parsed_data = json.loads(data_field)
+                agent_data = parsed_data.get("agent")
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        elif isinstance(data_field, dict):
+            agent_data = data_field.get("agent") or data_field
+    
+    if not agent_data:
+        agent_data = response.get("agent")
+    
+    if not agent_data and isinstance(response, dict) and "id" in response and "name" in response:
+        agent_data = response
+    
+    if isinstance(agent_data, dict) and agent_data.get("id"):
+        # Display key agent information
+        click.echo(f"  📝 Name: {agent_data.get('name', 'N/A')}")
+        click.echo(f"  🆔 ID: {agent_data.get('id', 'N/A')}")
+        
+        if agent_data.get("status"):
+            status_emoji = "✅" if agent_data.get("status") == "active" else "⏸️"
+            click.echo(f"  {status_emoji} Status: {agent_data.get('status')}")
+        
+        if agent_data.get("description"):
+            desc = agent_data.get("description")
+            if len(desc) > 100:
+                desc = desc[:97] + "..."
+            click.echo(f"  📄 Description: {desc}")
+        
+        if agent_data.get("model_name"):
+            click.echo(f"  🤖 Model: {agent_data.get('model_name')}")
+        
+        click.echo(f"  📅 Created: {agent_data.get('created_at', 'N/A')}")
+        
+        # Show full details if format is json or yaml
+        if format in ["json", "yaml"]:
+            click.echo(f"\n{'-' * 60}")
+            click.echo("📋 Full Response Details:")
+            click.echo('-' * 60)
+            click.echo(format_output(response, format))
+    else:
+        click.echo(f"\n{format_output(response, format)}")
 
 
 @cmd.command("embed-code")

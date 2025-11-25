@@ -276,7 +276,7 @@ knowrithm conversation messages <conversation-id> --page 1 --per-page 50
 # Send a message
 knowrithm conversation chat <conversation-id> --payload '{"message": "Hello, I need help"}'
 
-# Interactive chat mode (coming soon)
+# Interactive chat mode
 knowrithm conversation chat <conversation-id> --interactive
 ```
 
@@ -664,7 +664,7 @@ cd knowrithm-cli/examples
 
 - **Documentation**: https://docs.knowrithm.org
 - **Discord**: https://discord.gg/knowrithm
-- **Email**: support@knowrithm.org
+- **Email**: agentx@notifications.knowrithm.org
 - **GitHub Issues**: https://github.com/knowrithm/knowrithm-cli/issues
 
 ## Contributing

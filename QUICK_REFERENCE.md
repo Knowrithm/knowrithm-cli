@@ -357,5 +357,5 @@ knowrithm config clear-cache
 
 - **Docs**: https://docs.knowrithm.org
 - **Discord**: https://discord.gg/knowrithm
-- **Email**: support@knowrithm.org
+- **Email**: agentx@notifications.knowrithm.org
 - **GitHub**: https://github.com/knowrithm/knowrithm-cli

@@ -147,12 +147,17 @@ class Formatter:
         if not data:
             return "No data to display"
 
-        # Get all unique keys
+        # Get all unique keys (only from dict items)
         keys = []
         for item in data:
-            for key in item.keys():
-                if key not in keys:
-                    keys.append(key)
+            if isinstance(item, dict):
+                for key in item.keys():
+                    if key not in keys:
+                        keys.append(key)
+
+        # If no keys found (all items are non-dict), fall back to simple display
+        if not keys:
+            return "\\n".join(str(item) for item in data)
 
         # Create table
         table = Table(box=box.ROUNDED, show_header=True, header_style="bold cyan")
@@ -163,11 +168,12 @@ class Formatter:
 
         # Add rows
         for item in data:
-            row = []
-            for key in keys:
-                value = item.get(key, "")
-                row.append(self._format_value(value))
-            table.add_row(*row)
+            if isinstance(item, dict):
+                row = []
+                for key in keys:
+                    value = item.get(key, "")
+                    row.append(self._format_value(value))
+                table.add_row(*row)
 
         # Render to string
         from io import StringIO
@@ -364,6 +370,10 @@ class Formatter:
         # Detect data type based on keys in first item
         first_item = data[0]
         
+        # If first item is not a dict, return as-is
+        if not isinstance(first_item, dict):
+            return data
+        
         # Define essential columns for different entity types
         essential_columns = {
             # Agents
@@ -404,8 +414,9 @@ class Formatter:
             columns = essential_columns[entity_type]
             filtered_data = []
             for item in data:
-                filtered_item = {k: v for k, v in item.items() if k in columns}
-                filtered_data.append(filtered_item)
+                if isinstance(item, dict):
+                    filtered_item = {k: v for k, v in item.items() if k in columns}
+                    filtered_data.append(filtered_item)
             return filtered_data
 
         # If too many columns (>10), show only first 10
@@ -413,8 +424,9 @@ class Formatter:
             keys_to_show = list(first_item.keys())[:10]
             filtered_data = []
             for item in data:
-                filtered_item = {k: v for k, v in item.items() if k in keys_to_show}
-                filtered_data.append(filtered_item)
+                if isinstance(item, dict):
+                    filtered_item = {k: v for k, v in item.items() if k in keys_to_show}
+                    filtered_data.append(filtered_item)
             return filtered_data
 
         return data

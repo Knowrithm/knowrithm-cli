@@ -23,7 +23,7 @@ The CLI has been significantly improved with user-friendly features:
 - **⚡ Quick Commands**: Update agents without complex JSON payloads
 - **💡 Better Errors**: Meaningful messages with helpful suggestions
 
-**See [ENHANCEMENT_SUMMARY.md](ENHANCEMENT_SUMMARY.md) for details and [USER_GUIDE.md](USER_GUIDE.md) for comprehensive examples.**
+**See [ENHANCEMENT_SUMMARY.md](ENHANCEMENT_SUMMARY.md) for details, [USER_GUIDE.md](USER_GUIDE.md) for comprehensive examples, and [PYTHON_SDK_EXAMPLES.md](PYTHON_SDK_EXAMPLES.md) for Python code examples.**
 
 ## Table of Contents
 
@@ -107,6 +107,15 @@ The CLI has been significantly improved with user-friendly features:
 The `knowrithm` executable will be available on your `$PATH` after installation.
 
 ## Quick Start
+
+### 0. Launch Interactive Dashboard (NEW!)
+
+```bash
+# View the beautiful Knowrithm dashboard with all commands
+knowrithm dashboard
+```
+
+This displays a gorgeous ASCII logo and interactive menu with all available commands, quick actions, and helpful information!
 
 ### 1. Initial Setup
 
@@ -1066,7 +1075,7 @@ knowrithm system health
 For issues and questions:
 - Check the troubleshooting section above
 - Review command help: `knowrithm COMMAND --help`
-- Contact Knowrithm support: support@knowrithm.org
+- Contact Knowrithm support: agentx@notifications.knowrithm.org
 - API Documentation: https://docs.knowrithm.org
 
 ## License

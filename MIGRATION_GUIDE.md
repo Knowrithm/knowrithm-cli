@@ -500,7 +500,7 @@ knowrithm agent update "Support Bot" --payload '{"status": "active", "name": "Ne
 
 ### Support
 - **Discord**: https://discord.gg/knowrithm
-- **Email**: support@knowrithm.org
+- **Email**: agentx@notifications.knowrithm.org
 - **GitHub Issues**: https://github.com/knowrithm/knowrithm-cli/issues
 
 ### Command Help

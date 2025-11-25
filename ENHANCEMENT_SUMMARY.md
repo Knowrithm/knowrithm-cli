@@ -101,7 +101,29 @@ knowrithm agent update agent_id --payload '{"name": "New Name", "status": "activ
 knowrithm agent update "Support Bot" --name "New Name" --status active
 ```
 
-### 7. **Better User Experience** ✅
+### 7. **Interactive Dashboard** ✅ NEW!
+- **New Feature**: Beautiful ASCII logo and command menu
+- **Benefits**: Professional welcome screen, easy command discovery
+- **Usage**: `knowrithm dashboard`
+
+**Features**:
+- Large KNOWRITHM ASCII logo in cyan
+- Organized command table with emojis and examples
+- Quick actions panel with common workflows
+- Information panel with docs, support, and version
+- Clean, color-coded interface
+
+**Example**:
+```bash
+knowrithm dashboard
+# Displays beautiful dashboard with:
+# - ASCII logo
+# - All 12 main commands
+# - Quick action shortcuts
+# - Documentation links
+```
+
+### 8. **Better User Experience** ✅
 - Confirmation prompts for destructive operations
 - Progress indicators for async operations
 - Success/error indicators (✓/✗)
@@ -194,6 +216,9 @@ knowrithm agent list  # Returns raw JSON
 
 ### After (Enhanced CLI)
 ```bash
+# Launch beautiful interactive dashboard
+knowrithm dashboard
+
 # Interactive and guided
 knowrithm agent create --interactive
 # Or quick create
@@ -380,6 +405,7 @@ Users can adopt new features gradually:
 
 The enhanced Knowrithm CLI provides a significantly better user experience while maintaining full backward compatibility. Key improvements include:
 
+- ✅ Interactive Dashboard (beautiful welcome screen with ASCII logo)
 - ✅ Name-based resource identification (no more UUID memorization)
 - ✅ Context management (faster workflows)
 - ✅ Interactive creation modes (easier for beginners)
@@ -399,6 +425,9 @@ pip install -r requirements.txt
 
 # Install CLI
 pip install -e .
+
+# Launch the dashboard
+knowrithm dashboard
 
 # Try the new features
 knowrithm agent create --interactive

@@ -383,7 +383,7 @@ knowrithm agent create --interactive
 ### Community
 - **Discord**: https://discord.gg/knowrithm
 - **GitHub**: https://github.com/knowrithm/knowrithm-cli
-- **Email**: support@knowrithm.org
+- **Email**: agentx@notifications.knowrithm.org
 
 ### Getting Help
 ```bash

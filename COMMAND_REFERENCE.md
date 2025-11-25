@@ -3876,7 +3876,7 @@ knowrithm agent list
 ## Additional Resources
 
 - **API Documentation**: https://docs.knowrithm.org
-- **Support**: support@knowrithm.org
+- **Support**: agentx@notifications.knowrithm.org
 - **GitHub**: https://github.com/knowrithm/knowrithm-cli
 
 ---

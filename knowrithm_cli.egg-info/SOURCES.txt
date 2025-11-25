@@ -21,6 +21,7 @@ knowrithm_cli/commands/company.py
 knowrithm_cli/commands/config_cmd.py
 knowrithm_cli/commands/context_cmd.py
 knowrithm_cli/commands/conversation.py
+knowrithm_cli/commands/dashboard.py
 knowrithm_cli/commands/database.py
 knowrithm_cli/commands/document.py
 knowrithm_cli/commands/lead.py

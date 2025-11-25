@@ -136,11 +136,79 @@ def messages(auth: str, format: str, conversation_id: str, page: int, per_page: 
         params={"page": page, "per_page": per_page},
         **auth_kwargs(auth),
     )
-    click.echo(format_output(response, format))
+    
+    # Extract messages from response
+    messages_data = None
+    if "data" in response:
+        data_field = response["data"]
+        if isinstance(data_field, str):
+            try:
+                import json
+                parsed_data = json.loads(data_field)
+                messages_data = parsed_data.get("messages", [])
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        elif isinstance(data_field, dict):
+            messages_data = data_field.get("messages", [])
+        elif isinstance(data_field, list):
+            messages_data = data_field
+    
+    if not messages_data:
+        messages_data = response.get("messages", [])
+    
+    # Display in a chat-like format for better readability
+    if messages_data and isinstance(messages_data, list) and format == "table":
+        click.echo(f"\n💬 Conversation Messages ({len(messages_data)} messages)\n")
+        click.echo("=" * 80)
+        
+        for msg in messages_data:
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            created_at = msg.get("created_at", "")
+            model = msg.get("model_used", "")
+            processing_time = msg.get("processing_time", "")
+            
+            # Role indicator
+            if role == "user":
+                role_emoji = "👤"
+                role_label = "User"
+            elif role == "assistant":
+                role_emoji = "🤖"
+                role_label = "Assistant"
+            else:
+                role_emoji = "ℹ️"
+                role_label = role.title()
+            
+            click.echo(f"\n{role_emoji} {role_label}")
+            if created_at:
+                click.echo(f"   📅 {created_at}")
+            
+            # Content
+            click.echo(f"   💬 {content}")
+            
+            # Additional info for assistant messages
+            if role == "assistant":
+                if model:
+                    click.echo(f"   🤖 Model: {model}")
+                if processing_time:
+                    click.echo(f"   ⏱️  Processing: {processing_time}s")
+                
+                # Show sources if available
+                metadata = msg.get("metadata", {})
+                if isinstance(metadata, dict):
+                    cited_sources = metadata.get("cited_sources", [])
+                    if cited_sources:
+                        click.echo(f"   📚 Sources: {len(cited_sources)} citations")
+            
+            click.echo("-" * 80)
+    else:
+        # Fallback to standard formatting
+        click.echo(format_output(response, format))
 
 
 @cmd.command("chat")
 @auth_option()
+@format_option()
 @click.argument("conversation_id")
 @click.option("--payload", help="JSON string or @path containing the message body.")
 @click.option("--message", "-m", help="Quick message text (alternative to --payload)")
@@ -148,6 +216,7 @@ def messages(auth: str, format: str, conversation_id: str, page: int, per_page: 
 @click.option("--wait/--no-wait", default=True, show_default=True)
 def chat(
     auth: str,
+    format: str,
     conversation_id: str,
     payload: Optional[str],
     message: Optional[str],
@@ -221,7 +290,93 @@ def chat(
         )
         if response.get("task_id"):
             response = client.handle_async_response(response, wait=wait)
-        click.echo(format_output(response, format))
+        
+        # Display in a user-friendly format
+        if format == "table":
+            # Extract the response message
+            response_text = None
+            response_data = None
+            
+            # Try to extract from various response structures
+            if "data" in response:
+                data_field = response["data"]
+                if isinstance(data_field, str):
+                    try:
+                        import json
+                        parsed_data = json.loads(data_field)
+                        response_data = parsed_data
+                        response_text = parsed_data.get("response") or parsed_data.get("message") or parsed_data.get("content")
+                    except (json.JSONDecodeError, AttributeError):
+                        response_text = data_field
+                elif isinstance(data_field, dict):
+                    response_data = data_field
+                    response_text = data_field.get("response") or data_field.get("message") or data_field.get("content")
+            
+            if not response_text:
+                response_text = response.get("response") or response.get("message") or response.get("content")
+                response_data = response
+            
+            if response_text:
+                click.echo("\n✅ Message sent successfully!\n")
+                click.echo("🤖 Assistant Response:")
+                click.echo("=" * 80)
+                click.echo(f"\n{response_text}\n")
+                click.echo("=" * 80)
+                
+                # Show additional info if available
+                if response_data and isinstance(response_data, dict):
+                    if response_data.get("model_used"):
+                        click.echo(f"\n   🤖 Model: {response_data.get('model_used')}")
+                    if response_data.get("processing_time"):
+                        click.echo(f"   ⏱️  Processing: {response_data.get('processing_time')}s")
+                    
+                    # Show sources if available
+                    metadata = response_data.get("metadata", {})
+                    if isinstance(metadata, dict):
+                        cited_sources = metadata.get("cited_sources", [])
+                        if cited_sources:
+                            click.echo(f"   📚 Sources: {len(cited_sources)} citations")
+            else:
+                # No response text found - show what we have
+                click.echo("\n✅ Message sent successfully!\n")
+                
+                if response_data and isinstance(response_data, dict):
+                    # Show status
+                    status = response_data.get("status")
+                    if status:
+                        click.echo(f"   ℹ️  Status: {status}")
+                    
+                    # Show processing time
+                    processing_time = response_data.get("processing_time")
+                    if processing_time:
+                        click.echo(f"   ⏱️  Processing: {processing_time}s")
+                    
+                    # Show message ID
+                    message_id = response_data.get("message_id")
+                    if message_id:
+                        click.echo(f"   🆔 Message ID: {message_id}")
+                    
+                    # Show sources
+                    all_sources = response_data.get("all_sources", [])
+                    cited_sources = response_data.get("cited_sources", [])
+                    
+                    if cited_sources:
+                        click.echo(f"\n   📚 Cited Sources ({len(cited_sources)}):")
+                        for source in cited_sources[:5]:  # Show first 5
+                            click.echo(f"      • {source}")
+                    elif all_sources:
+                        click.echo(f"\n   📚 Available Sources ({len(all_sources)}):")
+                        for source in all_sources[:5]:  # Show first 5
+                            click.echo(f"      • {source}")
+                    
+                    click.echo("\n   ℹ️  Note: Response text not available in API response")
+                    click.echo("   💡 Try checking the conversation messages to see the full response")
+                else:
+                    # Fallback to standard formatting
+                    click.echo(format_output(response, format))
+        else:
+            # Use standard formatting for non-table formats
+            click.echo(format_output(response, format))
 
 
 @cmd.command("delete")

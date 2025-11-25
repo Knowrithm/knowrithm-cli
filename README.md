@@ -99,6 +99,15 @@ The `knowrithm` executable will be available on your `$PATH` after installation.
 
 ## Quick Start
 
+### 0. Launch Interactive Dashboard (NEW!)
+
+```bash
+# View the beautiful Knowrithm dashboard with all commands
+knowrithm dashboard
+```
+
+This displays a gorgeous ASCII logo and interactive menu with all available commands, quick actions, and helpful information!
+
 ### 1. Initial Setup
 
 ```bash
@@ -1057,7 +1066,7 @@ knowrithm system health
 For issues and questions:
 - Check the troubleshooting section above
 - Review command help: `knowrithm COMMAND --help`
-- Contact Knowrithm support: support@knowrithm.org
+- Contact Knowrithm support: agentx@notifications.knowrithm.org
 - API Documentation: https://docs.knowrithm.org
 
 ## License
