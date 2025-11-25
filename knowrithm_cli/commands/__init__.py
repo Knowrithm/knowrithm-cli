@@ -24,6 +24,7 @@ def _load_groups() -> Iterable[click.Group]:
         auth,
         company,
         config_cmd,
+        context_cmd,
         conversation,
         database,
         document,
@@ -36,6 +37,7 @@ def _load_groups() -> Iterable[click.Group]:
     return (
         config_cmd.cmd,
         auth.cmd,
+        context_cmd.cmd,
         agent.cmd,
         conversation.cmd,
         document.cmd,

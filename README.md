@@ -2,10 +2,25 @@
 
 A comprehensive Python command-line interface for the Knowrithm enterprise multi-agent chatbot platform. The CLI provides full access to the REST API, enabling developers and operators to manage agents, ingest content, handle leads, analyze conversations, and query analytics directly from the terminal.
 
+## 🎉 What's New - Enhanced User Experience!
+
+The CLI has been significantly improved with user-friendly features:
+
+- **✨ Name-Based Lookups**: Use agent names instead of UUIDs (`knowrithm agent get "Support Bot"`)
+- **🎯 Context Management**: Set active agent/conversation once, use everywhere
+- **🧙 Interactive Wizards**: Step-by-step guided agent creation
+- **📊 Beautiful Formatting**: Table, tree, CSV, and YAML output formats
+- **🔍 Fuzzy Matching**: "Did you mean?" suggestions for typos
+- **⚡ Quick Commands**: Update agents without complex JSON payloads
+- **💡 Better Errors**: Meaningful messages with helpful suggestions
+
+**See [ENHANCEMENT_SUMMARY.md](ENHANCEMENT_SUMMARY.md) for details and [USER_GUIDE.md](USER_GUIDE.md) for comprehensive examples.**
+
 ## Table of Contents
 
 - [Features](#features)
 - [Installation](#installation)
+- [Quick Start](#quick-start)
 - [Configuration](#configuration)
 - [Authentication](#authentication)
 - [Command Reference](#command-reference)
@@ -27,6 +42,15 @@ A comprehensive Python command-line interface for the Knowrithm enterprise multi
 - **Website Awareness**: Source registration, crawling, page discovery
 - **LLM Settings**: Provider configuration, model selection, testing
 - **System Utilities**: Health checks, task status polling, geographic data
+
+### Enhanced User Experience (NEW!)
+- **Name Resolution**: Reference resources by name instead of UUID
+- **Context Management**: Maintain active agent, conversation, organization
+- **Interactive Modes**: Guided wizards for complex operations
+- **Multiple Output Formats**: JSON, table, tree, CSV, YAML
+- **Fuzzy Matching**: Typo-tolerant name lookups
+- **Quick Options**: Common operations without JSON payloads
+- **Better Error Handling**: Meaningful messages with suggestions
 
 ### Technical Features
 - Asynchronous task support with optional polling (`--wait` flags)
@@ -72,6 +96,58 @@ A comprehensive Python command-line interface for the Knowrithm enterprise multi
    ```
 
 The `knowrithm` executable will be available on your `$PATH` after installation.
+
+## Quick Start
+
+### 1. Initial Setup
+
+```bash
+# Set API endpoint
+knowrithm config set-base-url https://app.knowrithm.org/api
+
+# Login
+knowrithm auth login
+# Enter your email and password when prompted
+```
+
+### 2. Create Your First Agent (Interactive Mode)
+
+```bash
+# Launch interactive wizard
+knowrithm agent create --interactive
+
+# Follow the prompts:
+# - Agent name: "Support Bot"
+# - Description: "Customer support agent"
+# - Configure advanced settings? No
+```
+
+### 3. Set Active Agent (Context)
+
+```bash
+# Set as active agent
+knowrithm context set agent "Support Bot"
+
+# Now you can use commands without specifying the agent
+knowrithm agent stats
+knowrithm agent test --query "Hello, how can you help?"
+```
+
+### 4. List Agents (Beautiful Table Format)
+
+```bash
+# View all agents in a formatted table
+knowrithm agent list --format table
+```
+
+### 5. Get Agent Details by Name
+
+```bash
+# No need to remember UUIDs!
+knowrithm agent get "Support Bot" --format tree
+```
+
+**That's it!** You're ready to use the CLI. See [USER_GUIDE.md](USER_GUIDE.md) for more examples and [QUICK_REFERENCE.md](QUICK_REFERENCE.md) for a command cheat sheet.
 
 ## Configuration
 
