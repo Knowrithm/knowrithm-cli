@@ -40,6 +40,12 @@ def _extract_tokens(payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     return None
 
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+
+console = Console()
+
 @cmd.command("login")
 @format_option()
 @click.option("--email", prompt=True, help="User email.")
@@ -66,7 +72,34 @@ def login(email: str, password: str, wait: bool, format: str) -> None:
     tokens = _extract_tokens(response)
     if tokens:
         _store_tokens(tokens)
-    click.echo(format_output(response, format))
+    
+    # Check for user data in various locations
+    user_data = response.get("user")
+    if not user_data and isinstance(response.get("data"), dict):
+        user_data = response["data"].get("user")
+    
+    if format == "table" and user_data:
+        table = Table(show_header=False, box=None, padding=(0, 2))
+        table.add_column("Key", style="bold cyan")
+        table.add_column("Value", style="white")
+        
+        full_name = f"{user_data.get('first_name', '')} {user_data.get('last_name', '')}".strip()
+        table.add_row("User:", f"{full_name} ({user_data.get('email', '')})")
+        table.add_row("Role:", user_data.get("role", "Unknown").title())
+        table.add_row("ID:", user_data.get("id", "Unknown"))
+        
+        status = user_data.get("status", "unknown")
+        status_style = "green" if status == "active" else "yellow"
+        table.add_row("Status:", f"[{status_style}]{status.title()}[/{status_style}]")
+        
+        console.print(Panel(
+            table,
+            title="[bold green]Login Successful[/bold green]",
+            border_style="green",
+            expand=False
+        ))
+    else:
+        click.echo(format_output(response, format))
 
 
 @cmd.command("logout")

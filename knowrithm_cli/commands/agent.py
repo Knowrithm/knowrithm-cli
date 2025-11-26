@@ -866,3 +866,93 @@ def embed_code(auth: str, format: str, agent_name_or_id: Optional[str]) -> None:
         click.echo("\n=========================\n")
     
     click.echo(format_output(response, format))
+
+
+@cmd.command("chat")
+@auth_option()
+@click.argument("agent_name_or_id", required=False)
+def chat_agent(auth: str, agent_name_or_id: Optional[str]) -> None:
+    """Start an interactive chat with an agent.
+    
+    If no agent is specified, lists available agents for selection.
+    """
+    client = make_client()
+    resolver = NameResolver(client)
+    
+    # 1. Resolve Agent
+    if not agent_name_or_id:
+        # Fetch agents
+        click.echo("Fetching agents...")
+        response = client.get("/api/v1/agent", params={"per_page": 100}, **auth_kwargs(auth))
+        agents = response.get("agents", [])
+        
+        if not agents:
+            # Try checking nested data structure
+            if "data" in response and isinstance(response["data"], dict):
+                 agents = response["data"].get("agents", [])
+            elif "data" in response and isinstance(response["data"], list):
+                 agents = response["data"]
+        
+        if not agents:
+            click.echo("No agents found.")
+            return
+            
+        # Display selection
+        click.echo("\nSelect an agent to chat with:")
+        for idx, agent in enumerate(agents, 1):
+            name = agent.get("name", "Unknown")
+            status = agent.get("status", "unknown")
+            model = agent.get("model_name", "N/A")
+            click.echo(f"  {idx}. {name} (Status: {status}, Model: {model})")
+            
+        selection = click.prompt("\nEnter number", type=click.IntRange(1, len(agents)))
+        selected_agent = agents[selection - 1]
+        agent_id = selected_agent.get("id")
+        agent_name = selected_agent.get("name")
+    else:
+        try:
+            agent_id = resolver.resolve_agent(agent_name_or_id)
+            # Get name for display
+            agent_details = client.get(f"/api/v1/agent/{agent_id}", **auth_kwargs(auth))
+            # Handle potential nested structure
+            if "data" in agent_details and isinstance(agent_details["data"], dict):
+                agent_details = agent_details["data"].get("agent", agent_details["data"])
+            elif "agent" in agent_details:
+                agent_details = agent_details["agent"]
+                
+            agent_name = agent_details.get("name", agent_name_or_id)
+        except click.ClickException as e:
+            click.echo(str(e), err=True)
+            raise SystemExit(1)
+
+    # 2. Create Conversation
+    click.echo(f"\nStarting chat with {agent_name}...")
+    conv_payload = {
+        "agent_id": agent_id,
+        "title": f"Chat with {agent_name}"
+    }
+    
+    try:
+        conv_response = client.post("/api/v1/conversation", json=conv_payload, **auth_kwargs(auth))
+        conversation_id = conv_response.get("id")
+        
+        if not conversation_id:
+             # Fallback if ID is not directly in response (check data)
+             if "data" in conv_response and isinstance(conv_response["data"], dict):
+                 conversation_id = conv_response["data"].get("id")
+             elif "conversation" in conv_response:
+                 conversation_id = conv_response["conversation"].get("id")
+        
+        if not conversation_id:
+            click.echo("Failed to create conversation.")
+            click.echo(format_output(conv_response, "json"))
+            return
+            
+    except Exception as e:
+        click.echo(f"Error creating conversation: {e}")
+        return
+
+    # 3. Start Interactive Chat
+    # Import here to avoid circular dependency at module level if any
+    from .conversation import run_interactive_chat
+    run_interactive_chat(client, conversation_id, auth_kwargs(auth))

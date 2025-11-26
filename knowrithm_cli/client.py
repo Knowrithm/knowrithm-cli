@@ -200,24 +200,31 @@ class KnowrithmClient:
         timeout: float = 300.0,
     ) -> Dict[str, Any]:
         """Poll the task status endpoint until completion."""
+        from rich.console import Console
+        from rich.spinner import Spinner
+        from rich.live import Live
+        
+        console = Console()
         elapsed = 0.0
-        while True:
-            response = self.get(
-                f"/api/v1/tasks/{task_id}/status",
-                require_auth=False,
-                use_jwt=False,
-            )
-            state = response.get("state") or response.get("status")
-            if state in {"SUCCESS", "completed", "finished"}:
-                return response.get("result") or response
-            if state in {"FAILURE", "failed", "error"}:
-                raise KnowrithmAPIError(
-                    response.get("error") or response.get("message") or f"Task {task_id} failed.",
+        
+        with Live(Spinner("dots", text="[cyan]Agent is thinking...[/cyan]"), console=console, refresh_per_second=10) as live:
+            while True:
+                response = self.get(
+                    f"/api/v1/tasks/{task_id}/status",
+                    require_auth=False,
+                    use_jwt=False,
                 )
-            if timeout and elapsed >= timeout:
-                raise KnowrithmAPIError(f"Timed out waiting for task {task_id}.")
-            click.echo(
-                f"Task {task_id} status: {state or 'unknown'} – polling again in {poll_interval}s..."
-            )
-            time.sleep(poll_interval)
-            elapsed += poll_interval
+                state = response.get("state") or response.get("status")
+                if state in {"SUCCESS", "completed", "finished"}:
+                    live.stop()
+                    return response.get("result") or response
+                if state in {"FAILURE", "failed", "error"}:
+                    live.stop()
+                    raise KnowrithmAPIError(
+                        response.get("error") or response.get("message") or f"Task {task_id} failed.",
+                    )
+                if timeout and elapsed >= timeout:
+                    live.stop()
+                    raise KnowrithmAPIError(f"Timed out waiting for task {task_id}.")
+                time.sleep(poll_interval)
+                elapsed += poll_interval

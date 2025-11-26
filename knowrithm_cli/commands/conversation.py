@@ -206,6 +206,145 @@ def messages(auth: str, format: str, conversation_id: str, page: int, per_page: 
         click.echo(format_output(response, format))
 
 
+def run_interactive_chat(client, conversation_id, auth_kwargs, wait=True):
+    """Run an interactive chat session."""
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.text import Text
+    from rich.markdown import Markdown
+    import re
+    
+    console = Console()
+    
+    console.print(Panel(
+        f"[bold cyan]Interactive Chat[/bold cyan]\n[dim]Conversation ID: {conversation_id}[/dim]",
+        border_style="cyan"
+    ))
+    console.print("[dim]Type your messages below. Press Ctrl+C to exit.[/dim]\n")
+    
+    try:
+        while True:
+            user_message = console.input("[bold green]You:[/bold green] ")
+            
+            if not user_message.strip():
+                continue
+            
+            body = {"message": user_message}
+            response = client.post(
+                f"/api/v1/conversation/{conversation_id}/chat",
+                json=body,
+                **auth_kwargs,
+            )
+            
+            # Handle async response (wait for task completion)
+            if response.get("task_id"):
+                task_result = client.handle_async_response(response, wait=wait)
+                
+                # After task completes, fetch the latest messages
+                messages_response = client.get(
+                    f"/api/v1/conversation/{conversation_id}/messages",
+                    params={"per_page": 10},  # Get last 10 messages
+                    **auth_kwargs,
+                )
+                
+                # Extract messages from response
+                messages = []
+                if "messages" in messages_response:
+                    messages = messages_response["messages"]
+                elif "data" in messages_response and isinstance(messages_response["data"], dict):
+                    messages = messages_response["data"].get("messages", [])
+                elif "data" in messages_response and isinstance(messages_response["data"], list):
+                    messages = messages_response["data"]
+                
+                # Use the messages from the fetch
+                response = {"messages": messages}
+            
+            # Extract assistant response from messages array
+            assistant_response = None
+            sources = []
+            model_used = None
+            processing_time = None
+            
+            # Check if response has messages array
+            if "messages" in response and isinstance(response["messages"], list):
+                # Get the last message (should be the assistant's response)
+                for msg in reversed(response["messages"]):
+                    if msg.get("role") == "assistant":
+                        assistant_response = msg.get("content")
+                        model_used = msg.get("model_used")
+                        processing_time = msg.get("processing_time")
+                        
+                        # Extract sources from metadata
+                        metadata = msg.get("metadata", {})
+                        if isinstance(metadata, dict):
+                            cited_sources = metadata.get("cited_sources", [])
+                            all_sources = metadata.get("all_sources", [])
+                            sources = cited_sources if cited_sources else all_sources
+                        break
+            
+            # Fallback to old response structure
+            if not assistant_response:
+                assistant_response = response.get("response") or response.get("message") or response.get("content")
+                # Try to get sources from top level
+                sources = response.get("cited_sources", []) or response.get("all_sources", [])
+            
+            # Display assistant response
+            if assistant_response:
+                # Clean up inline source citations like [Source 1, 2, 3]
+                cleaned_response = re.sub(r'\[Source[^\]]+\]', '', assistant_response)
+                # Remove multiple consecutive newlines
+                cleaned_response = re.sub(r'\n{3,}', '\n\n', cleaned_response)
+                
+                console.print(f"\n[bold blue]Assistant:[/bold blue]\n")
+                
+                # Render as markdown for proper formatting
+                md = Markdown(cleaned_response)
+                console.print(md)
+                console.print()
+                
+                # Display metadata if available
+                metadata_parts = []
+                if model_used:
+                    metadata_parts.append(f"🤖 Model: {model_used}")
+                if processing_time:
+                    metadata_parts.append(f"⏱️  {processing_time:.2f}s")
+                
+                if metadata_parts:
+                    console.print(f"[dim]{' | '.join(metadata_parts)}[/dim]")
+                
+                # Display sources if available
+                if sources:
+                    console.print(f"\n[bold cyan]📚 Sources ({len(sources)}):[/bold cyan]")
+                    # Parse and clean up source entries
+                    for idx, source in enumerate(sources[:5], 1):  # Show first 5
+                        # Convert to string if not already
+                        if not isinstance(source, str):
+                            source = str(source)
+                        
+                        # Extract filename and URL if present
+                        # Format: "Source X: filename (URL)"
+                        source_match = re.match(r'Source \d+:\s*(.+?)\s*\((.+?)\)', source)
+                        if source_match:
+                            filename = source_match.group(1)
+                            url = source_match.group(2)
+                            console.print(f"  [dim]{idx}.[/dim] [link={url}]{filename}[/link]")
+                        else:
+                            console.print(f"  [dim]{idx}.[/dim] {source}")
+                    if len(sources) > 5:
+                        console.print(f"  [dim]... and {len(sources) - 5} more[/dim]")
+                
+                # Add separator line
+                console.print(f"\n[dim]{'─' * console.width}[/dim]\n")
+            else:
+                # No response text found - show raw response
+                console.print("[yellow]⚠️  Unexpected response format:[/yellow]")
+                print_json(response)
+                console.print()
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n[dim]Exiting chat...[/dim]")
+        return
+
+
 @cmd.command("chat")
 @auth_option()
 @format_option()
@@ -239,37 +378,8 @@ def chat(
     
     if interactive:
         # Interactive chat mode
-        click.echo(f"=== Interactive Chat (Conversation: {conversation_id}) ===")
-        click.echo("Type your messages below. Press Ctrl+C to exit.\n")
-        
-        try:
-            while True:
-                user_message = click.prompt("You", type=str)
-                
-                if not user_message.strip():
-                    continue
-                
-                body = {"message": user_message}
-                response = client.post(
-                    f"/api/v1/conversation/{conversation_id}/chat",
-                    json=body,
-                    **auth_kwargs(auth),
-                )
-                
-                if response.get("task_id"):
-                    response = client.handle_async_response(response, wait=wait)
-                
-                # Extract and display assistant response
-                if "response" in response:
-                    click.echo(f"\nAssistant: {response['response']}\n")
-                elif "message" in response:
-                    click.echo(f"\nAssistant: {response['message']}\n")
-                else:
-                    print_json(response)
-                    click.echo()
-        except (KeyboardInterrupt, EOFError):
-            click.echo("\n\nExiting chat...")
-            return
+        run_interactive_chat(client, conversation_id, auth_kwargs(auth), wait=wait)
+        return
     
     elif message:
         # Quick message mode
