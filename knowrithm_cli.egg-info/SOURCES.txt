@@ -4,6 +4,7 @@ knowrithm_cli/__init__.py
 knowrithm_cli/cli.py
 knowrithm_cli/client.py
 knowrithm_cli/config.py
+knowrithm_cli/shell.py
 knowrithm_cli/utils.py
 knowrithm_cli.egg-info/PKG-INFO
 knowrithm_cli.egg-info/SOURCES.txt

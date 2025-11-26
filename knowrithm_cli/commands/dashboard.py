@@ -10,7 +10,6 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
-from rich.layout import Layout
 from rich.align import Align
 
 console = Console()
@@ -137,13 +136,12 @@ def cmd() -> None:
     console.print(Align.center(commands_table))
     console.print()
     
-    # Create layout for quick actions and info
-    layout = Layout()
-    layout.split_row(
-        Layout(create_quick_actions_panel(), name="quick"),
-        Layout(create_info_panel(), name="info")
-    )
-    console.print(layout)
+    # Create grid for quick actions and info
+    grid = Table.grid(expand=True, padding=1)
+    grid.add_column(ratio=1)
+    grid.add_column(ratio=1)
+    grid.add_row(create_quick_actions_panel(), create_info_panel())
+    console.print(grid)
     console.print()
     
     # Footer
