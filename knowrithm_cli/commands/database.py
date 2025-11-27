@@ -51,10 +51,19 @@ def create_connection(auth: str, format: str, payload: str) -> None:
 @cmd.command("get")
 @auth_option()
 @format_option()
-@click.argument("connection_id")
-def get_connection(auth: str, format: str, connection_id: str) -> None:
-    """Get details for a connection."""
+@click.argument("connection_id", required=False)
+def get_connection(auth: str, format: str, connection_id: Optional[str]) -> None:
+    """Get details for a connection.
+    
+    If no connection ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not connection_id:
+        from ..interactive import select_database
+        click.echo("\n🔍 Select a database connection to view:")
+        connection_id, _ = select_database(client, message="Select connection")
+        
     response = client.get(f"/api/v1/database-connection/{connection_id}", **auth_kwargs(auth))
     click.echo(format_output(response, format))
 
@@ -62,10 +71,19 @@ def get_connection(auth: str, format: str, connection_id: str) -> None:
 @cmd.command("delete")
 @auth_option()
 @format_option()
-@click.argument("connection_id")
-def delete_connection(auth: str, format: str, connection_id: str) -> None:
-    """Soft delete a connection."""
+@click.argument("connection_id", required=False)
+def delete_connection(auth: str, format: str, connection_id: Optional[str]) -> None:
+    """Soft delete a connection.
+    
+    If no connection ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not connection_id:
+        from ..interactive import select_database
+        click.echo("\n🗑️  Select a database connection to delete:")
+        connection_id, _ = select_database(client, message="Select connection")
+        
     response = client.delete(f"/api/v1/database-connection/{connection_id}", **auth_kwargs(auth))
     click.echo(format_output(response, format))
 
@@ -73,10 +91,40 @@ def delete_connection(auth: str, format: str, connection_id: str) -> None:
 @cmd.command("restore")
 @auth_option()
 @format_option()
-@click.argument("connection_id")
-def restore_connection(auth: str, format: str, connection_id: str) -> None:
-    """Restore a deleted connection."""
+@click.argument("connection_id", required=False)
+def restore_connection(auth: str, format: str, connection_id: Optional[str]) -> None:
+    """Restore a deleted connection.
+    
+    If no connection ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not connection_id:
+        # Try to list deleted connections
+        try:
+            response = client.get("/api/v1/database-connection/deleted", **auth_kwargs(auth))
+            connections = response.get("connections", [])
+            if not connections:
+                click.echo("❌ No deleted connections found.")
+                return
+                
+            from ..interactive import select_from_dict
+            
+            def format_conn(conn):
+                return f"{conn.get('name', 'Unknown')} (Deleted: {conn.get('deleted_at', 'N/A')})"
+                
+            click.echo("\n♻️  Select a connection to restore:")
+            connection_id, _ = select_from_dict(
+                "Select connection to restore",
+                connections,
+                display_key="name",
+                value_key="id",
+                format_choice=format_conn
+            )
+        except Exception as e:
+            click.echo(f"❌ Error fetching deleted connections: {e}")
+            return
+
     response = client.patch(
         f"/api/v1/database-connection/{connection_id}/restore",
         **auth_kwargs(auth),
@@ -87,10 +135,19 @@ def restore_connection(auth: str, format: str, connection_id: str) -> None:
 @cmd.command("test")
 @auth_option()
 @format_option()
-@click.argument("connection_id")
-def test_connection(auth: str, format: str, connection_id: str) -> None:
-    """Test a database connection."""
+@click.argument("connection_id", required=False)
+def test_connection(auth: str, format: str, connection_id: Optional[str]) -> None:
+    """Test a database connection.
+    
+    If no connection ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not connection_id:
+        from ..interactive import select_database
+        click.echo("\n🧪 Select a database connection to test:")
+        connection_id, _ = select_database(client, message="Select connection")
+        
     response = client.post(
         f"/api/v1/database-connection/{connection_id}/test",
         **auth_kwargs(auth),
@@ -101,11 +158,20 @@ def test_connection(auth: str, format: str, connection_id: str) -> None:
 @cmd.command("analyze")
 @auth_option()
 @format_option()
-@click.argument("connection_id")
+@click.argument("connection_id", required=False)
 @click.option("--wait/--no-wait", default=False, show_default=True)
-def analyze_connection(auth: str, format: str, connection_id: str, wait: bool) -> None:
-    """Queue semantic analysis for a connection."""
+def analyze_connection(auth: str, format: str, connection_id: Optional[str], wait: bool) -> None:
+    """Queue semantic analysis for a connection.
+    
+    If no connection ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not connection_id:
+        from ..interactive import select_database
+        click.echo("\n🧠 Select a database connection to analyze:")
+        connection_id, _ = select_database(client, message="Select connection")
+        
     response = client.post(
         f"/api/v1/database-connection/{connection_id}/analyze",
         **auth_kwargs(auth),
@@ -137,12 +203,21 @@ def analyze_all(auth: str, format: str, payload: Optional[str], wait: bool) -> N
 @cmd.command("tables")
 @auth_option()
 @format_option()
-@click.argument("connection_id")
+@click.argument("connection_id", required=False)
 @click.option("--page", default=1, type=int)
 @click.option("--per-page", default=50, type=int)
-def list_tables(auth: str, format: str, connection_id: str, page: int, per_page: int) -> None:
-    """List table metadata for a connection."""
+def list_tables(auth: str, format: str, connection_id: Optional[str], page: int, per_page: int) -> None:
+    """List table metadata for a connection.
+    
+    If no connection ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not connection_id:
+        from ..interactive import select_database
+        click.echo("\n📋 Select a database connection to view tables:")
+        connection_id, _ = select_database(client, message="Select connection")
+        
     response = client.get(
         f"/api/v1/database-connection/{connection_id}/table",
         params={"page": page, "per_page": per_page},
@@ -196,10 +271,19 @@ def restore_table(auth: str, format: str, table_id: str) -> None:
 @cmd.command("semantic-snapshot")
 @auth_option()
 @format_option()
-@click.argument("connection_id")
-def semantic_snapshot(auth: str, format: str, connection_id: str) -> None:
-    """Retrieve the semantic snapshot for a connection."""
+@click.argument("connection_id", required=False)
+def semantic_snapshot(auth: str, format: str, connection_id: Optional[str]) -> None:
+    """Retrieve the semantic snapshot for a connection.
+    
+    If no connection ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not connection_id:
+        from ..interactive import select_database
+        click.echo("\n📸 Select a database connection to view snapshot:")
+        connection_id, _ = select_database(client, message="Select connection")
+        
     response = client.get(
         f"/api/v1/database-connection/{connection_id}/semantic-snapshot",
         **auth_kwargs(auth),
@@ -210,10 +294,19 @@ def semantic_snapshot(auth: str, format: str, connection_id: str) -> None:
 @cmd.command("knowledge-graph")
 @auth_option()
 @format_option()
-@click.argument("connection_id")
-def knowledge_graph(auth: str, format: str, connection_id: str) -> None:
-    """Retrieve the knowledge graph for a connection."""
+@click.argument("connection_id", required=False)
+def knowledge_graph(auth: str, format: str, connection_id: Optional[str]) -> None:
+    """Retrieve the knowledge graph for a connection.
+    
+    If no connection ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not connection_id:
+        from ..interactive import select_database
+        click.echo("\n🕸️  Select a database connection to view knowledge graph:")
+        connection_id, _ = select_database(client, message="Select connection")
+        
     response = client.get(
         f"/api/v1/database-connection/{connection_id}/knowledge-graph",
         **auth_kwargs(auth),
@@ -224,10 +317,19 @@ def knowledge_graph(auth: str, format: str, connection_id: str) -> None:
 @cmd.command("sample-queries")
 @auth_option()
 @format_option()
-@click.argument("connection_id")
-def sample_queries(auth: str, format: str, connection_id: str) -> None:
-    """Retrieve generated sample queries for a connection."""
+@click.argument("connection_id", required=False)
+def sample_queries(auth: str, format: str, connection_id: Optional[str]) -> None:
+    """Retrieve generated sample queries for a connection.
+    
+    If no connection ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not connection_id:
+        from ..interactive import select_database
+        click.echo("\n❓ Select a database connection to view sample queries:")
+        connection_id, _ = select_database(client, message="Select connection")
+        
     response = client.get(
         f"/api/v1/database-connection/{connection_id}/sample-queries",
         **auth_kwargs(auth),
@@ -238,12 +340,32 @@ def sample_queries(auth: str, format: str, connection_id: str) -> None:
 @cmd.command("text-to-sql")
 @auth_option()
 @format_option()
-@click.argument("connection_id")
-@click.option("--payload", required=True, help="JSON payload with natural language question.")
-def text_to_sql(auth: str, format: str, connection_id: str, payload: str) -> None:
-    """Generate SQL from natural language."""
-    body = load_json_payload(payload)
+@click.argument("connection_id", required=False)
+@click.option("--payload", help="JSON payload with natural language question.")
+@click.option("--question", "-q", help="Natural language question (alternative to --payload)")
+def text_to_sql(auth: str, format: str, connection_id: Optional[str], payload: Optional[str], question: Optional[str]) -> None:
+    """Generate SQL from natural language.
+    
+    If no connection ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not connection_id:
+        from ..interactive import select_database
+        click.echo("\n🗣️  Select a database connection to query:")
+        connection_id, _ = select_database(client, message="Select connection")
+        
+    if question:
+        body = {"question": question}
+    elif payload:
+        body = load_json_payload(payload)
+    else:
+        # Interactive question input
+        from ..interactive import text_input
+        click.echo("\n❓ Enter your question:")
+        q = text_input("Question")
+        body = {"question": q}
+        
     response = client.post(
         f"/api/v1/database-connection/{connection_id}/text-to-sql",
         json=body,

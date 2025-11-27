@@ -66,10 +66,19 @@ def list_leads(auth: str, format: str, status: Optional[str], search: Optional[s
 @cmd.command("get")
 @auth_option()
 @format_option()
-@click.argument("lead_id")
-def get_lead(auth: str, format: str, lead_id: str) -> None:
-    """Retrieve a specific lead."""
+@click.argument("lead_id", required=False)
+def get_lead(auth: str, format: str, lead_id: Optional[str]) -> None:
+    """Retrieve a specific lead.
+    
+    If no lead ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not lead_id:
+        from ..interactive import select_lead
+        click.echo("\n👤 Select a lead to view:")
+        lead_id, _ = select_lead(client, message="Select lead")
+        
     response = client.get(f"/api/v1/lead/{lead_id}", **auth_kwargs(auth))
     click.echo(format_output(response, format))
 
@@ -77,12 +86,21 @@ def get_lead(auth: str, format: str, lead_id: str) -> None:
 @cmd.command("update")
 @auth_option()
 @format_option()
-@click.argument("lead_id")
+@click.argument("lead_id", required=False)
 @click.option("--payload", required=True, help="JSON payload with fields to update.")
-def update_lead(auth: str, format: str, lead_id: str, payload: str) -> None:
-    """Update a lead."""
-    body = load_json_payload(payload)
+def update_lead(auth: str, format: str, lead_id: Optional[str], payload: str) -> None:
+    """Update a lead.
+    
+    If no lead ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not lead_id:
+        from ..interactive import select_lead
+        click.echo("\n✏️  Select a lead to update:")
+        lead_id, _ = select_lead(client, message="Select lead")
+        
+    body = load_json_payload(payload)
     response = client.put(
         f"/api/v1/lead/{lead_id}",
         json=body,
@@ -94,9 +112,18 @@ def update_lead(auth: str, format: str, lead_id: str, payload: str) -> None:
 @cmd.command("delete")
 @auth_option()
 @format_option()
-@click.argument("lead_id")
-def delete_lead(auth: str, format: str, lead_id: str) -> None:
-    """Delete (soft delete) a lead."""
+@click.argument("lead_id", required=False)
+def delete_lead(auth: str, format: str, lead_id: Optional[str]) -> None:
+    """Delete (soft delete) a lead.
+    
+    If no lead ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not lead_id:
+        from ..interactive import select_lead
+        click.echo("\n🗑️  Select a lead to delete:")
+        lead_id, _ = select_lead(client, message="Select lead")
+        
     response = client.delete(f"/api/v1/lead/{lead_id}", **auth_kwargs(auth))
     click.echo(format_output(response, format))

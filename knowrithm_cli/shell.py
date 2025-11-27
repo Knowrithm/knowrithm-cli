@@ -11,6 +11,9 @@ from rich.panel import Panel
 from rich.text import Text
 from rich.table import Table
 from rich import box
+from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.history import InMemoryHistory
 
 console = Console()
 
@@ -77,10 +80,33 @@ def run_interactive_mode(ctx: click.Context):
              console.print("[red]Authentication failed or cancelled. Exiting.[/red]")
              return
 
+    # Build command list for auto-completion
+    command_names = list(ctx.command.commands.keys())
+    
+    # Add common shell commands
+    shell_commands = ['cd', 'ls', 'dir', 'pwd', 'clear', 'cls', 'exit', 'quit', 'help']
+    all_commands = command_names + shell_commands
+    
+    # Create completer
+    completer = WordCompleter(
+        all_commands,
+        ignore_case=True,
+        sentence=True,
+        match_middle=True
+    )
+    
+    # Create prompt session with history
+    session = PromptSession(
+        completer=completer,
+        history=InMemoryHistory(),
+        enable_history_search=True,
+        complete_while_typing=True
+    )
+
     while True:
         try:
-            # Show prompt
-            command_input = console.input("[bold green]knowrithm>[/bold green] ")
+            # Show prompt with auto-completion
+            command_input = session.prompt("knowrithm> ")
         except (EOFError, KeyboardInterrupt):
             console.print("\nGoodbye!")
             break

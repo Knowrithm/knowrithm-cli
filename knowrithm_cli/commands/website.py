@@ -34,10 +34,19 @@ def list_sources(auth: str, format: str, agent_id: Optional[str]) -> None:
 @cmd.command("agent")
 @auth_option()
 @format_option()
-@click.argument("agent_id_or_name")
-def agent_sources(auth: str, format: str, agent_id_or_name: str) -> None:
-    """List website sources for an agent (by name or ID)."""
+@click.argument("agent_id_or_name", required=False)
+def agent_sources(auth: str, format: str, agent_id_or_name: Optional[str]) -> None:
+    """List website sources for an agent (by name or ID).
+    
+    If no agent ID/name is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not agent_id_or_name:
+        from ..interactive import select_agent
+        click.echo("\n🤖 Select an agent to list sources for:")
+        agent_id_or_name, _ = select_agent(client, message="Select agent")
+        
     resolver = NameResolver(client)
     
     # Resolve agent name to ID
@@ -53,10 +62,19 @@ def agent_sources(auth: str, format: str, agent_id_or_name: str) -> None:
 @cmd.command("get")
 @auth_option()
 @format_option()
-@click.argument("source_id")
-def get_source(auth: str, format: str, source_id: str) -> None:
-    """Retrieve a website source by ID."""
+@click.argument("source_id", required=False)
+def get_source(auth: str, format: str, source_id: Optional[str]) -> None:
+    """Retrieve a website source by ID.
+    
+    If no source ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not source_id:
+        from ..interactive import select_website_source
+        click.echo("\n🌐 Select a website source to view:")
+        source_id, _ = select_website_source(client, message="Select source")
+        
     response = client.get(f"/api/v1/website/{source_id}", **auth_kwargs(auth))
     click.echo(format_output(response, format))
 
@@ -80,12 +98,21 @@ def create_source(auth: str, format: str, payload: str) -> None:
 @cmd.command("update")
 @auth_option()
 @format_option()
-@click.argument("source_id")
+@click.argument("source_id", required=False)
 @click.option("--payload", required=True, help="JSON payload with updates.")
-def update_source(auth: str, format: str, source_id: str, payload: str) -> None:
-    """Update a website source."""
-    body = load_json_payload(payload)
+def update_source(auth: str, format: str, source_id: Optional[str], payload: str) -> None:
+    """Update a website source.
+    
+    If no source ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not source_id:
+        from ..interactive import select_website_source
+        click.echo("\n✏️  Select a website source to update:")
+        source_id, _ = select_website_source(client, message="Select source")
+        
+    body = load_json_payload(payload)
     response = client.put(
         f"/api/v1/website/source/{source_id}",
         json=body,
@@ -97,11 +124,20 @@ def update_source(auth: str, format: str, source_id: str, payload: str) -> None:
 @cmd.command("delete")
 @auth_option()
 @format_option()
-@click.argument("source_id")
+@click.argument("source_id", required=False)
 @click.option("--wait/--no-wait", default=False, show_default=True)
-def delete_source(auth: str, format: str, source_id: str, wait: bool) -> None:
-    """Delete a website source."""
+def delete_source(auth: str, format: str, source_id: Optional[str], wait: bool) -> None:
+    """Delete a website source.
+    
+    If no source ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not source_id:
+        from ..interactive import select_website_source
+        click.echo("\n🗑️  Select a website source to delete:")
+        source_id, _ = select_website_source(client, message="Select source")
+        
     response = client.delete(
         f"/api/v1/website/source/{source_id}",
         **auth_kwargs(auth),
@@ -114,13 +150,22 @@ def delete_source(auth: str, format: str, source_id: str, wait: bool) -> None:
 @cmd.command("crawl")
 @auth_option()
 @format_option()
-@click.argument("source_id")
+@click.argument("source_id", required=False)
 @click.option("--payload", help="Optional JSON payload (e.g., max_pages).")
 @click.option("--wait/--no-wait", default=False, show_default=True)
-def crawl(auth: str, format: str, source_id: str, payload: Optional[str], wait: bool) -> None:
-    """Trigger a crawl job for a website source."""
-    body = load_json_payload(payload) if payload else None
+def crawl(auth: str, format: str, source_id: Optional[str], payload: Optional[str], wait: bool) -> None:
+    """Trigger a crawl job for a website source.
+    
+    If no source ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not source_id:
+        from ..interactive import select_website_source
+        click.echo("\n🕷️  Select a website source to crawl:")
+        source_id, _ = select_website_source(client, message="Select source")
+        
+    body = load_json_payload(payload) if payload else None
     response = client.post(
         f"/api/v1/website/source/{source_id}/crawl",
         json=body,
@@ -134,10 +179,19 @@ def crawl(auth: str, format: str, source_id: str, payload: Optional[str], wait: 
 @cmd.command("pages")
 @auth_option()
 @format_option()
-@click.argument("source_id")
-def list_pages(auth: str, format: str, source_id: str) -> None:
-    """List pages discovered for a source."""
+@click.argument("source_id", required=False)
+def list_pages(auth: str, format: str, source_id: Optional[str]) -> None:
+    """List pages discovered for a source.
+    
+    If no source ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not source_id:
+        from ..interactive import select_website_source
+        click.echo("\n📄 Select a website source to list pages:")
+        source_id, _ = select_website_source(client, message="Select source")
+        
     response = client.get(
         f"/api/v1/website/source/{source_id}/pages",
         **auth_kwargs(auth),

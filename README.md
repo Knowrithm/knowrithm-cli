@@ -14,23 +14,31 @@ The CLI has been significantly improved with user-friendly features:
 - **⚡ Quick Commands**: Update agents without complex JSON payloads
 - **💡 Better Errors**: Meaningful messages with helpful suggestions
 
+### 🚀 NEW: Interactive Features!
+
+The CLI now includes modern interactive features for a better user experience:
+
+- **⌨️ Command Auto-Completion**: Press `Tab` to auto-complete commands in interactive mode
+- **🎯 Arrow-Key Navigation**: Use arrow keys to navigate menus instead of typing numbers
+- **📜 Command History**: Navigate through previous commands with `↑` and `↓`
+- **🔍 History Search**: Press `Ctrl+R` to search through command history
+- **✨ Visual Feedback**: See highlighted selections before confirming
+
+**Try it now:**
+```bash
+# Enter interactive mode with auto-completion
+knowrithm
+
+# Create an agent with arrow-key menus
+knowrithm agent create --interactive
+```
+
+**See [QUICK_START_INTERACTIVE.md](QUICK_START_INTERACTIVE.md) for a quick guide, [INTERACTIVE_FEATURES.md](INTERACTIVE_FEATURES.md) for detailed documentation, and [INTERACTIVE_IMPLEMENTATION.md](INTERACTIVE_IMPLEMENTATION.md) for technical details.**
+
 **See [ENHANCEMENT_SUMMARY.md](ENHANCEMENT_SUMMARY.md) for details, [USER_GUIDE.md](USER_GUIDE.md) for comprehensive examples, and [PYTHON_SDK_EXAMPLES.md](PYTHON_SDK_EXAMPLES.md) for Python code examples.**
-
-## Table of Contents
-
-- [Features](#features)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Configuration](#configuration)
-- [Authentication](#authentication)
-- [Command Reference](#command-reference)
-- [Common Workflows](#common-workflows)
-- [Advanced Usage](#advanced-usage)
-- [Troubleshooting](#troubleshooting)
 
 ## Features
 
-### Core Capabilities
 - **Authentication Management**: JWT sessions, API key credentials, token refresh
 - **Agent Lifecycle**: Create, clone, update, delete, restore, statistics, testing, embed code generation
 - **Conversation Management**: List, create, chat, message handling, entity-scoped queries
@@ -44,13 +52,14 @@ The CLI has been significantly improved with user-friendly features:
 - **System Utilities**: Health checks, task status polling, geographic data
 
 ### Enhanced User Experience (NEW!)
+- **Interactive Resource Selection**: Select agents, documents, and more from menus instead of typing IDs
 - **Name Resolution**: Reference resources by name instead of UUID
 - **Context Management**: Maintain active agent, conversation, organization
 - **Interactive Modes**: Guided wizards for complex operations
 - **Multiple Output Formats**: JSON, table, tree, CSV, YAML
 - **Fuzzy Matching**: Typo-tolerant name lookups
 - **Quick Options**: Common operations without JSON payloads
-- **Better Error Handling**: Meaningful messages with suggestions
+- **Better Error Handling**: Meaningful messages with helpful suggestions
 
 ### Technical Features
 - Asynchronous task support with optional polling (`--wait` flags)
@@ -863,212 +872,8 @@ knowrithm agent list
 
 # Custom pagination
 knowrithm agent list --page 2 --per-page 50
-
-# Get all items (loop through pages)
-for i in {1..10}; do
-  knowrithm agent list --page $i --per-page 100
-done
 ```
-
-### Filtering and Search
-
-```bash
-# Filter agents by status
-knowrithm agent list --status active
-
-# Search agents
-knowrithm agent list --search "customer support"
-
-# Multiple filters
-knowrithm conversation entity \
-  --entity-type lead \
-  --status open \
-  --page 1 \
-  --per-page 20
-```
-
-### Piping and Integration
-
-```bash
-# Extract specific fields with jq
-knowrithm agent list | jq '.data[] | {id, name, status}'
-
-# Save output to file
-knowrithm agent get <agent_id> > agent-backup.json
-
-# Use in scripts
-AGENT_ID=$(knowrithm agent create --payload @agent.json | jq -r '.data.id')
-echo "Created agent: $AGENT_ID"
-```
-
-### Batch Operations
-
-```bash
-# Bulk delete documents
-knowrithm document bulk-delete --payload '{
-  "document_ids": [
-    "doc_1", "doc_2", "doc_3"
-  ]
-}'
-
-# Bulk restore companies
-knowrithm company bulk-restore --payload '{
-  "company_ids": [
-    "company_1", "company_2"
-  ]
-}'
-```
-
-## Troubleshooting
-
-### Connection Issues
-
-**Problem:** Cannot connect to API
-```bash
-# Check configuration
-knowrithm config show
-
-# Verify base URL is correct
-knowrithm config set-base-url https://correct-url.com
-
-# Test connection
-knowrithm system health
-```
-
-**Problem:** SSL certificate errors
-```bash
-# For development only - disable SSL verification
-knowrithm config set-verify-ssl --disable
-
-# For production - ensure proper certificates
-knowrithm config set-verify-ssl --enable
-```
-
-### Authentication Issues
-
-**Problem:** Token expired
-```bash
-# Refresh tokens
-knowrithm auth refresh
-
-# Or login again
-knowrithm auth login
-```
-
-**Problem:** Invalid credentials
-```bash
-# Clear all credentials and start fresh
-knowrithm auth clear --all
-
-# Login with correct credentials
-knowrithm auth login
-
-# Validate
-knowrithm auth validate
-```
-
-### Task Timeout
-
-**Problem:** Async task takes too long
-```bash
-# Run without waiting
-knowrithm agent create --payload @agent.json --no-wait
-
-# Get task ID from response, then poll manually
-knowrithm system task-status <task_id>
-```
-
-### Payload Errors
-
-**Problem:** Invalid JSON payload
-```bash
-# Validate JSON file
-cat payload.json | jq .
-
-# Use proper quotes
-knowrithm agent create --payload '{"key": "value"}'  # Correct
-knowrithm agent create --payload "{\"key\": \"value\"}"  # Also correct
-```
-
-### Permission Errors
-
-**Problem:** Insufficient permissions
-```bash
-# Check current user/company
-knowrithm auth me
-knowrithm company current
-
-# Ensure correct authentication method
-knowrithm agent list --auth jwt  # or --auth api-key
-```
-
-### Debugging
-
-**Enable verbose output:**
-```bash
-# Add -v or --verbose flag (if implemented)
-knowrithm -v agent list
-
-# Use debug mode
-export KNOWRITHM_DEBUG=1
-knowrithm agent list
-```
-
-## Development
-
-### Project Structure
-```
-knowrithm-cli/
-├── knowrithm_cli/
-│   ├── __init__.py
-│   ├── client.py          # HTTP client wrapper
-│   ├── config.py          # Configuration management
-│   ├── utils.py           # Shared utilities
-│   └── commands/
-│       ├── __init__.py
-│       ├── agent.py       # Agent commands
-│       ├── analytics.py   # Analytics commands
-│       ├── auth.py        # Authentication commands
-│       ├── common.py      # Shared command helpers
-│       ├── company.py     # Company commands
-│       ├── config_cmd.py  # Config commands
-│       ├── conversation.py # Conversation commands
-│       ├── database.py    # Database commands
-│       ├── document.py    # Document commands
-│       ├── lead.py        # Lead commands
-│       ├── settings.py    # LLM settings commands
-│       ├── system.py      # System utilities
-│       └── website.py     # Website commands
-├── setup.py
-├── README.md
-└── requirements.txt
-```
-
-### Running Tests
-```bash
-# Syntax check
-python -m compileall knowrithm_cli
-
-# Run basic smoke tests
-knowrithm --help
-knowrithm system health
-```
-
-### Contributing
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## Support
-
-For issues and questions:
-- Check the troubleshooting section above
-- Review command help: `knowrithm COMMAND --help`
-- Contact Knowrithm support: agentx@notifications.knowrithm.org
-- API Documentation: https://docs.knowrithm.org
 
 ## License
 
-Copyright © 2024 Knowrithm. All rights reserved.
+MIT

@@ -77,24 +77,36 @@ def entity_conversations(
 @cmd.command("agent")
 @auth_option()
 @format_option()
-@click.argument("agent_id_or_name")
+@click.argument("agent_id_or_name", required=False)
 @click.option("--status", help="Filter by conversation status.")
 @click.option("--page", default=1, type=int)
 @click.option("--per-page", default=20, type=int)
 def agent_conversations(
     auth: str,
     format: str,
-    agent_id_or_name: str,
+    agent_id_or_name: Optional[str],
     status: Optional[str],
     page: int,
     per_page: int,
 ) -> None:
-    """List conversations for a specific agent (by name or ID)."""
-    client = make_client()
-    resolver = NameResolver(client)
+    """List conversations for a specific agent (by name or ID).
     
-    # Resolve agent name to ID
-    agent_id = resolver.resolve_agent(agent_id_or_name)
+    If no agent is specified, an interactive selection menu will be shown.
+    """
+    client = make_client()
+    
+    if not agent_id_or_name:
+        from ..interactive import select_agent
+        click.echo("\n📂 Select an agent to view conversations:")
+        agent_id, _ = select_agent(client, "Select agent")
+    else:
+        resolver = NameResolver(client)
+        # Resolve agent name to ID
+        try:
+            agent_id = resolver.resolve_agent(agent_id_or_name)
+        except click.ClickException as e:
+            click.echo(str(e), err=True)
+            raise SystemExit(1)
     
     params = {"page": page, "per_page": per_page}
     if status:
@@ -125,12 +137,21 @@ def create_conversation(auth: str, payload: str, wait: bool) -> None:
 @cmd.command("messages")
 @auth_option()
 @format_option()
-@click.argument("conversation_id")
+@click.argument("conversation_id", required=False)
 @click.option("--page", default=1, type=int)
 @click.option("--per-page", default=50, type=int)
-def messages(auth: str, format: str, conversation_id: str, page: int, per_page: int) -> None:
-    """Retrieve messages for a conversation."""
+def messages(auth: str, format: str, conversation_id: Optional[str], page: int, per_page: int) -> None:
+    """Retrieve messages for a conversation.
+    
+    If no conversation ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not conversation_id:
+        from ..interactive import select_conversation
+        click.echo("\n💬 Select a conversation to view messages:")
+        conversation_id, _ = select_conversation(client, message="Select conversation")
+        
     response = client.get(
         f"/api/v1/conversation/{conversation_id}/messages",
         params={"page": page, "per_page": per_page},
@@ -348,7 +369,7 @@ def run_interactive_chat(client, conversation_id, auth_kwargs, wait=True):
 @cmd.command("chat")
 @auth_option()
 @format_option()
-@click.argument("conversation_id")
+@click.argument("conversation_id", required=False)
 @click.option("--payload", help="JSON string or @path containing the message body.")
 @click.option("--message", "-m", help="Quick message text (alternative to --payload)")
 @click.option("--interactive", "-i", is_flag=True, help="Interactive chat mode")
@@ -356,13 +377,15 @@ def run_interactive_chat(client, conversation_id, auth_kwargs, wait=True):
 def chat(
     auth: str,
     format: str,
-    conversation_id: str,
+    conversation_id: Optional[str],
     payload: Optional[str],
     message: Optional[str],
     interactive: bool,
     wait: bool
 ) -> None:
     """Send a chat message into a conversation.
+    
+    If no conversation ID is provided, an interactive selection menu will be shown.
     
     Examples:
         # Quick message
@@ -373,8 +396,20 @@ def chat(
         
         # Interactive mode
         knowrithm conversation chat <id> --interactive
+        
+        # Select conversation interactively
+        knowrithm conversation chat --interactive
     """
     client = make_client()
+    
+    if not conversation_id:
+        from ..interactive import select_conversation
+        click.echo("\n💬 Select a conversation to chat with:")
+        conversation_id, _ = select_conversation(client, message="Select conversation")
+        # If user didn't specify interactive flag but selected a conversation, 
+        # they probably want to chat interactively unless they provided a message
+        if not message and not payload and not interactive:
+            interactive = True
     
     if interactive:
         # Interactive chat mode
@@ -492,10 +527,19 @@ def chat(
 @cmd.command("delete")
 @auth_option()
 @format_option()
-@click.argument("conversation_id")
-def delete_conversation(auth: str, conversation_id: str) -> None:
-    """Soft delete a conversation."""
+@click.argument("conversation_id", required=False)
+def delete_conversation(auth: str, conversation_id: Optional[str]) -> None:
+    """Soft delete a conversation.
+    
+    If no conversation ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not conversation_id:
+        from ..interactive import select_conversation
+        click.echo("\n🗑️  Select a conversation to delete:")
+        conversation_id, _ = select_conversation(client, message="Select conversation")
+        
     response = client.delete(f"/api/v1/conversation/{conversation_id}", **auth_kwargs(auth))
     click.echo(format_output(response, format))
 
@@ -503,10 +547,40 @@ def delete_conversation(auth: str, conversation_id: str) -> None:
 @cmd.command("restore")
 @auth_option()
 @format_option()
-@click.argument("conversation_id")
-def restore_conversation(auth: str, conversation_id: str) -> None:
-    """Restore a soft-deleted conversation."""
+@click.argument("conversation_id", required=False)
+def restore_conversation(auth: str, conversation_id: Optional[str]) -> None:
+    """Restore a soft-deleted conversation.
+    
+    If no conversation ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not conversation_id:
+        # Try to list deleted conversations
+        try:
+            response = client.get("/api/v1/conversation/deleted", params={"per_page": 100}, **auth_kwargs(auth))
+            conversations = response.get("conversations", [])
+            if not conversations:
+                click.echo("❌ No deleted conversations found.")
+                return
+                
+            from ..interactive import select_from_dict
+            
+            def format_conv(conv):
+                return f"ID: {conv.get('id', 'Unknown')[:8]}... (Deleted: {conv.get('deleted_at', 'N/A')})"
+                
+            click.echo("\n♻️  Select a conversation to restore:")
+            conversation_id, _ = select_from_dict(
+                "Select conversation to restore",
+                conversations,
+                display_key="id",
+                value_key="id",
+                format_choice=format_conv
+            )
+        except Exception as e:
+            click.echo(f"❌ Error fetching deleted conversations: {e}")
+            return
+
     response = client.patch(
         f"/api/v1/conversation/{conversation_id}/restore",
         **auth_kwargs(auth),
@@ -517,10 +591,19 @@ def restore_conversation(auth: str, conversation_id: str) -> None:
 @cmd.command("delete-messages")
 @auth_option()
 @format_option()
-@click.argument("conversation_id")
-def delete_messages(auth: str, conversation_id: str) -> None:
-    """Delete all messages for a conversation."""
+@click.argument("conversation_id", required=False)
+def delete_messages(auth: str, conversation_id: Optional[str]) -> None:
+    """Delete all messages for a conversation.
+    
+    If no conversation ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not conversation_id:
+        from ..interactive import select_conversation
+        click.echo("\n🗑️  Select a conversation to delete messages from:")
+        conversation_id, _ = select_conversation(client, message="Select conversation")
+        
     response = client.delete(
         f"/api/v1/conversation/{conversation_id}/messages",
         **auth_kwargs(auth),
@@ -531,10 +614,19 @@ def delete_messages(auth: str, conversation_id: str) -> None:
 @cmd.command("restore-messages")
 @auth_option()
 @format_option()
-@click.argument("conversation_id")
-def restore_messages(auth: str, conversation_id: str) -> None:
-    """Restore all messages for a conversation."""
+@click.argument("conversation_id", required=False)
+def restore_messages(auth: str, conversation_id: Optional[str]) -> None:
+    """Restore all messages for a conversation.
+    
+    If no conversation ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not conversation_id:
+        from ..interactive import select_conversation
+        click.echo("\n♻️  Select a conversation to restore messages for:")
+        conversation_id, _ = select_conversation(client, message="Select conversation")
+        
     response = client.patch(
         f"/api/v1/conversation/{conversation_id}/message/restore-all",
         **auth_kwargs(auth),

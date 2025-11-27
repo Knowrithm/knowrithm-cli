@@ -49,10 +49,19 @@ def create_settings_sdk(auth: str, format: str, payload: str, wait: bool) -> Non
 @cmd.command("list-company")
 @auth_option()
 @format_option()
-@click.argument("company_id")
-def list_company_settings(auth: str, format: str, company_id: str) -> None:
-    """List settings for a company."""
+@click.argument("company_id", required=False)
+def list_company_settings(auth: str, format: str, company_id: Optional[str]) -> None:
+    """List settings for a company.
+    
+    If no company ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not company_id:
+        from ..interactive import select_company
+        click.echo("\n🏢 Select a company to list settings for:")
+        company_id, _ = select_company(client, message="Select company")
+        
     response = client.get(
         f"/api/v1/settings/company/{company_id}",
         **auth_kwargs(auth),
@@ -63,10 +72,19 @@ def list_company_settings(auth: str, format: str, company_id: str) -> None:
 @cmd.command("list-agent")
 @auth_option()
 @format_option()
-@click.argument("agent_id")
-def list_agent_settings(auth: str, format: str, agent_id: str) -> None:
-    """List settings for a given agent."""
+@click.argument("agent_id", required=False)
+def list_agent_settings(auth: str, format: str, agent_id: Optional[str]) -> None:
+    """List settings for a given agent.
+    
+    If no agent ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not agent_id:
+        from ..interactive import select_agent
+        click.echo("\n🤖 Select an agent to list settings for:")
+        agent_id, _ = select_agent(client, message="Select agent")
+        
     response = client.get(
         f"/api/v1/settings/agent/{agent_id}",
         **auth_kwargs(auth),
@@ -77,10 +95,19 @@ def list_agent_settings(auth: str, format: str, agent_id: str) -> None:
 @cmd.command("get")
 @auth_option()
 @format_option()
-@click.argument("settings_id")
-def get_settings(auth: str, format: str, settings_id: str) -> None:
-    """Retrieve a settings record."""
+@click.argument("settings_id", required=False)
+def get_settings(auth: str, format: str, settings_id: Optional[str]) -> None:
+    """Retrieve a settings record.
+    
+    If no settings ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not settings_id:
+        from ..interactive import select_settings
+        click.echo("\n⚙️  Select settings to view:")
+        settings_id, _ = select_settings(client, message="Select settings")
+        
     response = client.get(f"/api/v1/settings/{settings_id}", **auth_kwargs(auth))
     click.echo(format_output(response, format))
 
@@ -88,13 +115,22 @@ def get_settings(auth: str, format: str, settings_id: str) -> None:
 @cmd.command("update")
 @auth_option()
 @format_option()
-@click.argument("settings_id")
+@click.argument("settings_id", required=False)
 @click.option("--payload", required=True, help="JSON payload with updated fields.")
 @click.option("--wait/--no-wait", default=True, show_default=True)
-def update_settings(auth: str, format: str, settings_id: str, payload: str, wait: bool) -> None:
-    """Update an LLM settings record."""
-    body = load_json_payload(payload)
+def update_settings(auth: str, format: str, settings_id: Optional[str], payload: str, wait: bool) -> None:
+    """Update an LLM settings record.
+    
+    If no settings ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not settings_id:
+        from ..interactive import select_settings
+        click.echo("\n✏️  Select settings to update:")
+        settings_id, _ = select_settings(client, message="Select settings")
+        
+    body = load_json_payload(payload)
     response = client.put(
         f"/api/v1/settings/{settings_id}",
         json=body,
@@ -108,11 +144,20 @@ def update_settings(auth: str, format: str, settings_id: str, payload: str, wait
 @cmd.command("delete")
 @auth_option()
 @format_option()
-@click.argument("settings_id")
+@click.argument("settings_id", required=False)
 @click.option("--wait/--no-wait", default=False, show_default=True)
-def delete_settings(auth: str, format: str, settings_id: str, wait: bool) -> None:
-    """Delete an LLM settings record."""
+def delete_settings(auth: str, format: str, settings_id: Optional[str], wait: bool) -> None:
+    """Delete an LLM settings record.
+    
+    If no settings ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not settings_id:
+        from ..interactive import select_settings
+        click.echo("\n🗑️  Select settings to delete:")
+        settings_id, _ = select_settings(client, message="Select settings")
+        
     response = client.delete(f"/api/v1/settings/{settings_id}", **auth_kwargs(auth))
     if response.get("task_id"):
         response = client.handle_async_response(response, wait=wait)
@@ -122,13 +167,22 @@ def delete_settings(auth: str, format: str, settings_id: str, wait: bool) -> Non
 @cmd.command("test")
 @auth_option()
 @format_option()
-@click.argument("settings_id")
+@click.argument("settings_id", required=False)
 @click.option("--payload", help="Optional JSON payload with overrides.")
 @click.option("--wait/--no-wait", default=True, show_default=True)
-def test_settings(auth: str, format: str, settings_id: str, payload: Optional[str], wait: bool) -> None:
-    """Validate settings by executing a test call."""
-    body = load_json_payload(payload) if payload else None
+def test_settings(auth: str, format: str, settings_id: Optional[str], payload: Optional[str], wait: bool) -> None:
+    """Validate settings by executing a test call.
+    
+    If no settings ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not settings_id:
+        from ..interactive import select_settings
+        click.echo("\n🧪 Select settings to test:")
+        settings_id, _ = select_settings(client, message="Select settings")
+        
+    body = load_json_payload(payload) if payload else None
     response = client.post(
         f"/api/v1/settings/test/{settings_id}",
         json=body,

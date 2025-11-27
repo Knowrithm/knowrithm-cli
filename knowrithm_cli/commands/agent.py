@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import click
 
@@ -10,6 +10,13 @@ from ..client import KnowrithmClient
 from ..core import get_context, NameResolver, format_output
 from ..utils import load_json_payload
 from .common import auth_kwargs, auth_option, format_option, make_client
+from ..interactive import (
+    select_agent,
+    select_from_dict,
+    select_from_list,
+    text_input,
+    confirm,
+)
 
 
 @click.group(name="agent")
@@ -195,8 +202,42 @@ def _interactive_agent_creation() -> dict:
     """Interactive wizard for agent creation."""
     click.echo("=== Create New Agent ===\n")
     
-    name = click.prompt("Agent name", type=str)
-    description = click.prompt("Description", default="", show_default=False)
+    name = text_input("Agent name")
+    description = text_input("Description", default="")
+
+
+def _interactive_agent_update(agent: Dict[str, Any]) -> Dict[str, Any]:
+    """Prompt user for agent fields to update."""
+    click.echo("\n=== Update Agent Details ===\n")
+    click.echo("Press Enter to keep the current value. Leave fields blank to clear text.\n")
+    
+    updates: Dict[str, Any] = {}
+    
+    current_name = (agent.get("name") or "").strip()
+    new_name = (text_input("Agent name", default=current_name) or "").strip()
+    if new_name and new_name != current_name:
+        updates["name"] = new_name
+    
+    current_description = agent.get("description") or ""
+    new_description = text_input("Description", default=current_description) or ""
+    if new_description != current_description:
+        updates["description"] = new_description
+    
+    current_status = agent.get("status", "active")
+    if confirm("Change status?", default=False):
+        status_default = current_status if current_status in {"active", "inactive", "training"} else "active"
+        new_status = select_from_list(
+            "Select new status",
+            ["active", "inactive", "training"],
+            default=status_default,
+        )
+        if new_status != current_status:
+            updates["status"] = new_status
+    
+    if not updates:
+        raise click.ClickException("No changes were entered. Update cancelled.")
+    
+    return updates
     
     # Fetch providers from API
     client = make_client()
@@ -230,20 +271,21 @@ def _interactive_agent_creation() -> dict:
         click.echo("❌ Error: No LLM providers found.")
         raise click.Abort()
     
-    for idx, provider in enumerate(llm_providers, 1):
+    # Format provider choices for display
+    def format_provider(provider):
         provider_name = provider.get("label", "Unknown")
         provider_type = provider.get("provider_type", "N/A")
-        click.echo(f"  {idx}. {provider_name} ({provider_type})")
+        return f"{provider_name} ({provider_type})"
     
-    provider_idx = click.prompt(
-        "\nSelect LLM provider (number)",
-        type=click.IntRange(1, len(llm_providers)),
-        default=1
+    llm_provider_id, selected_llm_provider = select_from_dict(
+        "Select LLM provider",
+        llm_providers,
+        display_key="label",
+        value_key="id",
+        format_choice=format_provider
     )
     
-    selected_llm_provider = llm_providers[provider_idx - 1]
     llm_provider = selected_llm_provider.get("label")
-    llm_provider_id = selected_llm_provider.get("id")
     
     # Fetch models for selected provider
     try:
@@ -262,21 +304,22 @@ def _interactive_agent_creation() -> dict:
         click.echo(f"❌ Error: No LLM models found for {llm_provider}")
         raise click.Abort()
     
-    click.echo(f"\n🤖 Available Models for {llm_provider}:")
-    for idx, model in enumerate(llm_models, 1):
+    # Format model choices for display
+    def format_model(model):
         model_name = model.get("name", model.get("label", "Unknown"))
         context = model.get("context_window", "N/A")
-        click.echo(f"  {idx}. {model_name} (context: {context})")
+        return f"{model_name} (context: {context})"
     
-    model_idx = click.prompt(
-        "\nSelect LLM model (number)",
-        type=click.IntRange(1, len(llm_models)),
-        default=1
+    click.echo(f"\n🤖 Available Models for {llm_provider}:")
+    llm_model_id, selected_llm_model = select_from_dict(
+        "Select LLM model",
+        llm_models,
+        display_key="name",
+        value_key="id",
+        format_choice=format_model
     )
     
-    selected_llm_model = llm_models[model_idx - 1]
     llm_model = selected_llm_model.get("name", selected_llm_model.get("label", "Unknown"))
-    llm_model_id = selected_llm_model.get("id")
     
     click.echo(f"\n✓ LLM: {llm_provider} / {llm_model}")
     
@@ -288,20 +331,15 @@ def _interactive_agent_creation() -> dict:
         click.echo("❌ Error: No embedding providers found.")
         raise click.Abort()
     
-    for idx, provider in enumerate(embedding_providers, 1):
-        provider_name = provider.get("label", "Unknown")
-        provider_type = provider.get("provider_type", "N/A")
-        click.echo(f"  {idx}. {provider_name} ({provider_type})")
-    
-    embedding_provider_idx = click.prompt(
-        "\nSelect embedding provider (number)",
-        type=click.IntRange(1, len(embedding_providers)),
-        default=1
+    embedding_provider_id, selected_embedding_provider = select_from_dict(
+        "Select embedding provider",
+        embedding_providers,
+        display_key="label",
+        value_key="id",
+        format_choice=format_provider
     )
     
-    selected_embedding_provider = embedding_providers[embedding_provider_idx - 1]
     embedding_provider = selected_embedding_provider.get("label")
-    embedding_provider_id = selected_embedding_provider.get("id")
     
     # Fetch models for selected embedding provider
     try:
@@ -320,21 +358,22 @@ def _interactive_agent_creation() -> dict:
         click.echo(f"❌ Error: No embedding models found for {embedding_provider}")
         raise click.Abort()
     
-    click.echo(f"\n🔤 Available Embedding Models for {embedding_provider}:")
-    for idx, model in enumerate(embedding_models, 1):
+    # Format embedding model choices for display
+    def format_embedding_model(model):
         model_name = model.get("name", model.get("label", "Unknown"))
         dimension = model.get("embedding_dimension", "N/A")
-        click.echo(f"  {idx}. {model_name} (dimension: {dimension})")
+        return f"{model_name} (dimension: {dimension})"
     
-    embedding_model_idx = click.prompt(
-        "\nSelect embedding model (number)",
-        type=click.IntRange(1, len(embedding_models)),
-        default=1
+    click.echo(f"\n🔤 Available Embedding Models for {embedding_provider}:")
+    embedding_model_id, selected_embedding_model = select_from_dict(
+        "Select embedding model",
+        embedding_models,
+        display_key="name",
+        value_key="id",
+        format_choice=format_embedding_model
     )
     
-    selected_embedding_model = embedding_models[embedding_model_idx - 1]
     embedding_model = selected_embedding_model.get("name", selected_embedding_model.get("label", "Unknown"))
-    embedding_model_id = selected_embedding_model.get("id")
     
     click.echo(f"\n✓ Embeddings: {embedding_provider} / {embedding_model}")
     
@@ -342,36 +381,36 @@ def _interactive_agent_creation() -> dict:
     llm_api_key = None
     embedding_api_key = None
     
-    if click.confirm("\nDo you want to provide API keys?", default=False):
-        llm_api_key = click.prompt(f"Enter API key for {llm_provider} (leave empty to skip)", default="", show_default=False)
+    if confirm("\nDo you want to provide API keys?", default=False):
+        llm_api_key = text_input(f"Enter API key for {llm_provider} (leave empty to skip)", default="")
         if not llm_api_key:
             llm_api_key = None
         
         if embedding_provider_id != llm_provider_id:
-            embedding_api_key = click.prompt(f"Enter API key for {embedding_provider} (leave empty to skip)", default="", show_default=False)
+            embedding_api_key = text_input(f"Enter API key for {embedding_provider} (leave empty to skip)", default="")
             if not embedding_api_key:
                 embedding_api_key = None
         else:
             embedding_api_key = llm_api_key
     
     # Optional fields
-    if click.confirm("\nConfigure advanced settings?", default=False):
-        status = click.prompt(
-            "Status",
-            type=click.Choice(["active", "inactive", "training"], case_sensitive=False),
-            default="active",
+    if confirm("\nConfigure advanced settings?", default=False):
+        status = select_from_list(
+            "Select agent status",
+            ["active", "inactive", "training"],
+            default="active"
         )
         
         # Personality traits
-        if click.confirm("Add personality traits?", default=False):
-            traits = click.prompt("Personality traits (comma-separated)", default="")
+        if confirm("Add personality traits?", default=False):
+            traits = text_input("Personality traits (comma-separated)", default="")
             personality_traits = [t.strip() for t in traits.split(",") if t.strip()]
         else:
             personality_traits = None
         
         # Capabilities
-        if click.confirm("Add capabilities?", default=False):
-            caps = click.prompt("Capabilities (comma-separated)", default="")
+        if confirm("Add capabilities?", default=False):
+            caps = text_input("Capabilities (comma-separated)", default="")
             capabilities = [c.strip() for c in caps.split(",") if c.strip()]
         else:
             capabilities = None
@@ -414,7 +453,7 @@ def _interactive_agent_creation() -> dict:
 @cmd.command("update")
 @auth_option()
 @format_option()
-@click.argument("agent_name_or_id")
+@click.argument("agent_name_or_id", required=False)
 @click.option("--payload", help="JSON string or @path with update fields.")
 @click.option("--name", help="New agent name")
 @click.option("--description", help="New description")
@@ -423,7 +462,7 @@ def _interactive_agent_creation() -> dict:
 def update_agent(
     auth: str,
     format: str,
-    agent_name_or_id: str,
+    agent_name_or_id: Optional[str],
     payload: Optional[str],
     name: Optional[str],
     description: Optional[str],
@@ -432,8 +471,13 @@ def update_agent(
 ) -> None:
     """Update an agent by name or ID.
     
+    If no agent is specified, an interactive selection menu will be shown.
+    
     Examples:
-        # Update name
+        # Interactive selection
+        knowrithm agent update --name "Customer Support Bot"
+        
+        # Update specific agent by name
         knowrithm agent update "Support Bot" --name "Customer Support Bot"
         
         # Update status
@@ -443,28 +487,58 @@ def update_agent(
         knowrithm agent update "Support Bot" --payload '{"description": "New description"}'
     """
     client = make_client()
-    resolver = NameResolver(client)
+    selected_agent: Optional[Dict[str, Any]] = None
+    agent_id: Optional[str] = None
     
-    try:
-        agent_id = resolver.resolve_agent(agent_name_or_id)
-    except click.ClickException as e:
-        click.echo(str(e), err=True)
-        raise SystemExit(1)
+    # If no agent specified, show interactive selection
+    if not agent_name_or_id:
+        click.echo("\n✏️  Select an agent to update:")
+        agent_id, selected_agent = select_agent(client, "Select agent to update")
+        agent_name_or_id = selected_agent.get("name")
+    else:
+        # Resolve agent name/ID
+        resolver = NameResolver(client)
+        try:
+            agent_id = resolver.resolve_agent(agent_name_or_id)
+        except click.ClickException as e:
+            click.echo(str(e), err=True)
+            raise SystemExit(1)
+    
+    if agent_id is None:
+        raise click.ClickException("Unable to resolve agent ID.")
     
     # Build update payload
     if payload:
         body = load_json_payload(payload)
     else:
-        body = {}
-        if name:
-            body["name"] = name
-        if description:
-            body["description"] = description
-        if status:
-            body["status"] = status
+        explicit_updates = any([name, description, status])
+        if explicit_updates:
+            body = {}
+            if name:
+                body["name"] = name
+            if description:
+                body["description"] = description
+            if status:
+                body["status"] = status
+        else:
+            # Interactive field editing
+            if not selected_agent:
+                response = client.get(f"/api/v1/agent/{agent_id}", **auth_kwargs(auth))
+                if isinstance(response, dict):
+                    selected_agent = response.get("agent")
+                    data_field = response.get("data")
+                    if not selected_agent and isinstance(data_field, dict):
+                        selected_agent = data_field.get("agent") or data_field
+                    if not selected_agent:
+                        selected_agent = response
+                else:
+                    selected_agent = {}
+            body = _interactive_agent_update(selected_agent or {})
         
         if not body:
-            raise click.ClickException("No updates specified. Use --name, --description, --status, or --payload.")
+            raise click.ClickException(
+                "No updates specified. Use --name, --description, --status, --payload, or complete the interactive prompts."
+            )
     
     response = client.put(f"/api/v1/agent/{agent_id}", json=body, **auth_kwargs(auth))
     
@@ -558,22 +632,33 @@ def update_agent(
 @cmd.command("delete")
 @auth_option()
 @format_option()
-@click.argument("agent_name_or_id")
+@click.argument("agent_name_or_id", required=False)
 @click.option("--wait/--no-wait", default=False, show_default=True)
 @click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
-def delete_agent(auth: str, format: str, agent_name_or_id: str, wait: bool, yes: bool) -> None:
-    """Soft delete an agent by name or ID."""
-    client = make_client()
-    resolver = NameResolver(client)
+def delete_agent(auth: str, format: str, agent_name_or_id: Optional[str], wait: bool, yes: bool) -> None:
+    """Soft delete an agent by name or ID.
     
-    try:
-        agent_id = resolver.resolve_agent(agent_name_or_id)
-    except click.ClickException as e:
-        click.echo(str(e), err=True)
-        raise SystemExit(1)
+    If no agent is specified, an interactive selection menu will be shown.
+    """
+    client = make_client()
+    
+    # If no agent specified, show interactive selection
+    if not agent_name_or_id:
+        from ..interactive import select_agent
+        click.echo("\n🗑️  Select an agent to delete:")
+        agent_id, selected_agent = select_agent(client, "Select agent to delete")
+        agent_name_or_id = selected_agent.get("name")
+    else:
+        # Resolve agent name/ID
+        resolver = NameResolver(client)
+        try:
+            agent_id = resolver.resolve_agent(agent_name_or_id)
+        except click.ClickException as e:
+            click.echo(str(e), err=True)
+            raise SystemExit(1)
     
     if not yes:
-        if not click.confirm(f"Are you sure you want to delete agent '{agent_name_or_id}'?"):
+        if not confirm(f"Are you sure you want to delete agent '{agent_name_or_id}'?"):
             click.echo("Cancelled.")
             return
     
@@ -899,15 +984,21 @@ def chat_agent(auth: str, agent_name_or_id: Optional[str]) -> None:
             
         # Display selection
         click.echo("\nSelect an agent to chat with:")
-        for idx, agent in enumerate(agents, 1):
+        
+        # Format agent choices for display
+        def format_agent(agent):
             name = agent.get("name", "Unknown")
             status = agent.get("status", "unknown")
             model = agent.get("model_name", "N/A")
-            click.echo(f"  {idx}. {name} (Status: {status}, Model: {model})")
-            
-        selection = click.prompt("\nEnter number", type=click.IntRange(1, len(agents)))
-        selected_agent = agents[selection - 1]
-        agent_id = selected_agent.get("id")
+            return f"{name} (Status: {status}, Model: {model})"
+        
+        agent_id, selected_agent = select_from_dict(
+            "Select an agent",
+            agents,
+            display_key="name",
+            value_key="id",
+            format_choice=format_agent
+        )
         agent_name = selected_agent.get("name")
     else:
         try:

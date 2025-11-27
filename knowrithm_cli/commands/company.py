@@ -46,10 +46,19 @@ def current_company(auth: str, format: str) -> None:
 @cmd.command("get")
 @auth_option()
 @format_option()
-@click.argument("company_id")
-def get_company(auth: str, format: str, company_id: str) -> None:
-    """Retrieve a specific company by ID."""
+@click.argument("company_id", required=False)
+def get_company(auth: str, format: str, company_id: Optional[str]) -> None:
+    """Retrieve a specific company by ID.
+    
+    If no company ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not company_id:
+        from ..interactive import select_company
+        click.echo("\n🏢 Select a company to view:")
+        company_id, _ = select_company(client, message="Select company")
+        
     response = client.get(f"/api/v1/company/{company_id}", **auth_kwargs(auth))
     click.echo(format_output(response, format))
 
@@ -73,12 +82,21 @@ def create_company(format: str, payload: str) -> None:
 @cmd.command("update")
 @auth_option()
 @format_option()
-@click.argument("company_id")
+@click.argument("company_id", required=False)
 @click.option("--payload", required=True, help="JSON payload with updates.")
-def update_company(auth: str, format: str, company_id: str, payload: str) -> None:
-    """Update company metadata."""
-    body = load_json_payload(payload)
+def update_company(auth: str, format: str, company_id: Optional[str], payload: str) -> None:
+    """Update company metadata.
+    
+    If no company ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not company_id:
+        from ..interactive import select_company
+        click.echo("\n✏️  Select a company to update:")
+        company_id, _ = select_company(client, message="Select company")
+        
+    body = load_json_payload(payload)
     response = client.put(
         f"/api/v1/company/{company_id}",
         json=body,
@@ -90,12 +108,21 @@ def update_company(auth: str, format: str, company_id: str, payload: str) -> Non
 @cmd.command("patch")
 @auth_option()
 @format_option()
-@click.argument("company_id")
+@click.argument("company_id", required=False)
 @click.option("--payload", required=True, help="JSON payload with partial update fields.")
-def patch_company(auth: str, format: str, company_id: str, payload: str) -> None:
-    """Partially update a company."""
-    body = load_json_payload(payload)
+def patch_company(auth: str, format: str, company_id: Optional[str], payload: str) -> None:
+    """Partially update a company.
+    
+    If no company ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not company_id:
+        from ..interactive import select_company
+        click.echo("\n✏️  Select a company to patch:")
+        company_id, _ = select_company(client, message="Select company")
+        
+    body = load_json_payload(payload)
     response = client.patch(
         f"/api/v1/company/{company_id}",
         json=body,
@@ -107,10 +134,19 @@ def patch_company(auth: str, format: str, company_id: str, payload: str) -> None
 @cmd.command("delete")
 @auth_option()
 @format_option()
-@click.argument("company_id")
-def delete_company(auth: str, format: str, company_id: str) -> None:
-    """Soft delete a company."""
+@click.argument("company_id", required=False)
+def delete_company(auth: str, format: str, company_id: Optional[str]) -> None:
+    """Soft delete a company.
+    
+    If no company ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not company_id:
+        from ..interactive import select_company
+        click.echo("\n🗑️  Select a company to delete:")
+        company_id, _ = select_company(client, message="Select company")
+        
     response = client.delete(
         f"/api/v1/company/{company_id}",
         **auth_kwargs(auth),
@@ -121,10 +157,40 @@ def delete_company(auth: str, format: str, company_id: str) -> None:
 @cmd.command("restore")
 @auth_option()
 @format_option()
-@click.argument("company_id")
-def restore_company(auth: str, format: str, company_id: str) -> None:
-    """Restore a soft-deleted company."""
+@click.argument("company_id", required=False)
+def restore_company(auth: str, format: str, company_id: Optional[str]) -> None:
+    """Restore a soft-deleted company.
+    
+    If no company ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not company_id:
+        # Try to list deleted companies
+        try:
+            response = client.get("/api/v1/company/deleted", **auth_kwargs(auth))
+            companies = response.get("companies", [])
+            if not companies:
+                click.echo("❌ No deleted companies found.")
+                return
+                
+            from ..interactive import select_from_dict
+            
+            def format_comp(comp):
+                return f"{comp.get('name', 'Unknown')} (Deleted: {comp.get('deleted_at', 'N/A')})"
+                
+            click.echo("\n♻️  Select a company to restore:")
+            company_id, _ = select_from_dict(
+                "Select company to restore",
+                companies,
+                display_key="name",
+                value_key="id",
+                format_choice=format_comp
+            )
+        except Exception as e:
+            click.echo(f"❌ Error fetching deleted companies: {e}")
+            return
+
     response = client.patch(
         f"/api/v1/company/{company_id}/restore",
         **auth_kwargs(auth),
@@ -180,8 +246,17 @@ def bulk_restore(auth: str, format: str, payload: str) -> None:
 @click.argument("company_id", required=False)
 @click.option("--days", type=int, help="Number of days to include.")
 def statistics(auth: str, format: str, company_id: Optional[str], days: Optional[int]) -> None:
-    """Retrieve lead statistics for a company."""
+    """Retrieve lead statistics for a company.
+    
+    If no company ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not company_id:
+        from ..interactive import select_company
+        click.echo("\n📊 Select a company to view statistics:")
+        company_id, _ = select_company(client, message="Select company")
+        
     params = {}
     if days is not None:
         params["days"] = days
@@ -195,10 +270,19 @@ def statistics(auth: str, format: str, company_id: Optional[str], days: Optional
 @cmd.command("related-data")
 @auth_option()
 @format_option()
-@click.argument("company_id")
-def related_data(auth: str, format: str, company_id: str) -> None:
-    """Inspect related data counts before deletion."""
+@click.argument("company_id", required=False)
+def related_data(auth: str, format: str, company_id: Optional[str]) -> None:
+    """Inspect related data counts before deletion.
+    
+    If no company ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not company_id:
+        from ..interactive import select_company
+        click.echo("\n🔍 Select a company to view related data:")
+        company_id, _ = select_company(client, message="Select company")
+        
     response = client.get(
         f"/api/v1/company/{company_id}/related-data",
         **auth_kwargs(auth),
@@ -209,12 +293,21 @@ def related_data(auth: str, format: str, company_id: str) -> None:
 @cmd.command("cascade-delete")
 @auth_option()
 @format_option()
-@click.argument("company_id")
+@click.argument("company_id", required=False)
 @click.option("--payload", help="Optional JSON payload with cascade options.")
-def cascade_delete(auth: str, format: str, company_id: str, payload: Optional[str]) -> None:
-    """Trigger cascade deletion for a company (super admin)."""
-    body = load_json_payload(payload) if payload else None
+def cascade_delete(auth: str, format: str, company_id: Optional[str], payload: Optional[str]) -> None:
+    """Trigger cascade deletion for a company (super admin).
+    
+    If no company ID is provided, an interactive selection menu will be shown.
+    """
     client = make_client()
+    
+    if not company_id:
+        from ..interactive import select_company
+        click.echo("\n💥 Select a company to cascade delete:")
+        company_id, _ = select_company(client, message="Select company")
+        
+    body = load_json_payload(payload) if payload else None
     response = client.delete(
         f"/api/v1/company/{company_id}/cascade-delete",
         json=body,
