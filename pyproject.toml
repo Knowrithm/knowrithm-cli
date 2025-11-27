@@ -5,8 +5,12 @@ description = "Command line interface for the Knowrithm enterprise multi-agent p
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
-    "click>=8.1",
-    "requests>=2.31",
+    "requests>=2.31.0",
+    "click>=8.1.0",
+    "rich>=13.0.0",
+    "pyyaml>=6.0.0",
+    "prompt_toolkit>=3.0.0",
+    "questionary>=2.0.0",
 ]
 
 [project.scripts]
