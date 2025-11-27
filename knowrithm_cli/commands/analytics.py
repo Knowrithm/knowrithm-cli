@@ -740,10 +740,16 @@ def agent_performance(auth: str, format: str, agent_id: Optional[str], start_dat
 @cmd.command("conversation")
 @auth_option()
 @format_option()
-@click.argument("conversation_id")
-def conversation_analytics(auth: str, format: str, conversation_id: str) -> None:
+@click.argument("conversation_id", required=False)
+def conversation_analytics(auth: str, format: str, conversation_id: Optional[str]) -> None:
     """Retrieve analytics for a conversation."""
     client = make_client()
+    
+    if conversation_id is None:
+        from ..interactive import select_conversation
+        click.echo("\n💬 Select a conversation to analyze:")
+        conversation_id, _ = select_conversation(client, message="Select a conversation")
+    
     response = client.get(
         f"/api/v1/analytic/conversation/{conversation_id}",
         **auth_kwargs(auth),
