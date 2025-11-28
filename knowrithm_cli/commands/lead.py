@@ -60,6 +60,36 @@ def list_leads(auth: str, format: str, status: Optional[str], search: Optional[s
     if search:
         params["search"] = search
     response = client.get("/api/v1/lead/company", params=params, **auth_kwargs(auth))
+    
+    if format == "table":
+        leads = response.get("leads")
+        if leads is None:
+            # Check for Data envelope (some endpoints wrap response)
+            data = response.get("Data") or response.get("data")
+            if isinstance(data, dict):
+                leads = data.get("leads")
+                
+        leads = leads or []
+        
+        if not leads:
+            click.echo("No leads found.")
+            return
+            
+        # Prepare rows for table
+        rows = []
+        for lead in leads:
+            rows.append({
+                "ID": lead.get("id"),
+                "Name": lead.get("full_name"),
+                "Email": lead.get("email"),
+                "Phone": lead.get("phone") or "",
+                "Status": lead.get("status"),
+                "Source": lead.get("source"),
+                "Created": lead.get("created_at", "").split("T")[0] if lead.get("created_at") else "",
+            })
+        click.echo(format_output(rows, "table"))
+        return
+
     click.echo(format_output(response, format))
 
 

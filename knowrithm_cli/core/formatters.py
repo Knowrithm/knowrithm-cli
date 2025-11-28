@@ -178,7 +178,8 @@ class Formatter:
         # Render to string
         from io import StringIO
         string_io = StringIO()
-        console = Console(file=string_io, force_terminal=False)
+        # Force terminal to ensure colors/styles are rendered, and set width to avoid wrapping issues in captured output
+        console = Console(file=string_io, force_terminal=True, width=120)
         console.print(table)
         return string_io.getvalue()
 

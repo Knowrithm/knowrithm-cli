@@ -449,8 +449,15 @@ def select_lead(client, message: str = "Select a lead"):
     
     # Fetch leads
     try:
-        response = client.get("/api/v1/lead", params={"per_page": 100}, require_auth=True)
-        leads = response.get("leads", [])
+        response = client.get("/api/v1/lead/company", params={"per_page": 100}, require_auth=True)
+        leads = response.get("leads")
+        if leads is None:
+            # Check for Data envelope
+            data = response.get("Data") or response.get("data")
+            if isinstance(data, dict):
+                leads = data.get("leads")
+        
+        leads = leads or []
         
         if not leads:
             click.echo("❌ No leads found.")

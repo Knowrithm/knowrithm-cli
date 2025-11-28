@@ -641,6 +641,100 @@ def _build_dashboard_sections(payload: Dict[str, Any]) -> List[Tuple[str, List[D
 
     return sections
 
+
+def _build_usage_sections(payload: Dict[str, Any]) -> List[Tuple[str, List[Dict[str, Any]]]]:
+    """Transform usage analytics payload into titled table sections."""
+    sections: List[Tuple[str, List[Dict[str, Any]]]] = []
+
+    # Agent Usage
+    agent = payload.get("agent_usage")
+    if isinstance(agent, dict):
+        rows = [
+            {"Metric": "Active Agents", "Value": agent.get("active_agents", 0)},
+            {"Metric": "Total Agents", "Value": agent.get("total_agents", 0)},
+            {"Metric": "Total Conversations", "Value": agent.get("total_conversations", 0)},
+            {"Metric": "Total Messages", "Value": agent.get("total_messages", 0)},
+            {"Metric": "Avg Agent Rating", "Value": _format_number(agent.get("avg_agent_rating"))},
+        ]
+        _append_section(sections, "Agent Usage", rows)
+
+    # API Usage
+    api = payload.get("api_usage")
+    if isinstance(api, dict):
+        _append_section(sections, "API Usage", [
+            {"Metric": "Total API Calls", "Value": api.get("total_api_calls", 0)},
+            {"Metric": "Success Count", "Value": api.get("success_count", 0)},
+            {"Metric": "Error Count", "Value": api.get("error_count", 0)},
+            {"Metric": "Error Rate", "Value": _format_percent(api.get("error_rate_percent"))},
+            {"Metric": "Active API Keys", "Value": api.get("active_api_keys", 0)},
+            {"Metric": "Avg Response Time (ms)", "Value": _format_number(api.get("avg_response_time_ms"))},
+        ])
+
+    # Storage Usage
+    storage = payload.get("storage_usage")
+    if isinstance(storage, dict):
+        _append_section(sections, "Storage Usage", [
+            {"Metric": "Total Conversations", "Value": storage.get("total_conversations", 0)},
+            {"Metric": "Total Messages", "Value": storage.get("total_messages", 0)},
+            {"Metric": "Total Content Size (Bytes)", "Value": storage.get("total_content_size_bytes", 0)},
+        ])
+
+    # Token Usage
+    token = payload.get("token_usage")
+    if isinstance(token, dict):
+        _append_section(sections, "Token Usage", [
+            {"Metric": "Total Tokens", "Value": token.get("total_tokens", 0)},
+            {"Metric": "Total Messages Processed", "Value": token.get("total_messages_processed", 0)},
+            {"Metric": "Avg Tokens / Message", "Value": _format_number(token.get("avg_tokens_per_message"))},
+        ])
+
+    # Endpoint Usage
+    endpoints = payload.get("endpoint_usage")
+    if isinstance(endpoints, list) and endpoints:
+        _append_section(sections, "Endpoint Usage", [
+            {
+                "Method": item.get("method", ""),
+                "Endpoint": item.get("endpoint", ""),
+                "Calls": item.get("call_count", 0),
+                "Avg Time (ms)": _format_number(item.get("avg_response_time_ms")),
+            }
+            for item in endpoints
+        ])
+
+    # Top Client IPs
+    ips = payload.get("top_client_ips")
+    if isinstance(ips, list) and ips:
+        _append_section(sections, "Top Client IPs", [
+            {
+                "IP Address": item.get("ip_address", ""),
+                "Requests": item.get("request_count", 0),
+            }
+            for item in ips
+        ])
+
+    # Daily Usage Trend
+    trend = payload.get("daily_usage_trend")
+    if isinstance(trend, list) and trend:
+        _append_section(sections, "Daily Usage Trend", [
+            {
+                "Date": item.get("date", ""),
+                "API Calls": item.get("api_calls", 0),
+                "Errors": item.get("errors", 0),
+                "Success Rate": _format_percent(item.get("success_rate_percent")),
+            }
+            for item in trend
+        ])
+
+    # Date Range
+    date_range = payload.get("date_range")
+    if isinstance(date_range, dict):
+        _append_section(sections, "Date Range", [
+            {"Metric": "Start Date", "Value": _format_date_value(date_range.get("start_date"))},
+            {"Metric": "End Date", "Value": _format_date_value(date_range.get("end_date"))},
+        ])
+
+    return sections
+
 @click.group(name="analytics")
 def cmd() -> None:
     """Access analytics dashboards and exports."""
@@ -814,6 +908,20 @@ def usage(auth: str, format: str, start_date: Optional[str], end_date: Optional[
     if end_date:
         params["end_date"] = end_date
     response = client.get("/api/v1/analytic/usage", params=params, **auth_kwargs(auth))
+
+    if format == "table":
+        sections = _build_usage_sections(response)
+        if not sections:
+            click.echo("No usage data to display")
+            return
+
+        for index, (title, rows) in enumerate(sections):
+            if index > 0:
+                click.echo()
+            click.echo(title)
+            click.echo(format_output(rows, "table").rstrip())
+        return
+
     click.echo(format_output(response, format))
 
 
