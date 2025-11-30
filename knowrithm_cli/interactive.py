@@ -568,3 +568,149 @@ def select_website_source(client, message: str = "Select website source"):
     except Exception as e:
         click.echo(f"❌ Error fetching website sources: {e}")
         raise click.Abort()
+
+
+def select_country(client, message: str = "Select a country"):
+    """
+    Fetch countries and present an interactive selection menu.
+    
+    Args:
+        client: KnowrithmClient instance
+        message: The prompt message
+        
+    Returns:
+        Tuple of (country_id, country_dict)
+    """
+    import click
+    
+    # Fetch countries
+    try:
+        response = client.get("/api/v1/country", require_auth=True)
+        
+        # Handle both response formats: list or dict with 'countries' key
+        if isinstance(response, list):
+            countries = response
+        else:
+            countries = response.get("countries", response.get("data", []))
+        
+        if not countries:
+            click.echo("❌ No countries found.")
+            raise click.Abort()
+        
+        # Format country choices
+        def format_country(country):
+            name = country.get("name", "Unknown")
+            code = country.get("iso2", "N/A")
+            return f"{name} ({code})"
+        
+        return select_from_dict(
+            message,
+            countries,
+            display_key="name",
+            value_key="id",
+            format_choice=format_country
+        )
+    except Exception as e:
+        click.echo(f"❌ Error fetching countries: {e}")
+        raise click.Abort()
+
+
+def select_state(client, country_id: Optional[str] = None, message: str = "Select a state"):
+    """
+    Fetch states and present an interactive selection menu.
+    
+    Args:
+        client: KnowrithmClient instance
+        country_id: Optional country ID to filter states
+        message: The prompt message
+        
+    Returns:
+        Tuple of (state_id, state_dict)
+    """
+    import click
+    
+    # If no country_id provided, ask user to select a country first
+    if not country_id:
+        click.echo("\n🌍 First, select a country:")
+        country_id, _ = select_country(client, message="Select country")
+    
+    # Fetch states
+    try:
+        response = client.get(f"/api/v1/state/country/{country_id}", require_auth=True)
+        
+        # Handle both response formats: list or dict with 'states' key
+        if isinstance(response, list):
+            states = response
+        else:
+            states = response.get("states", response.get("data", []))
+        
+        if not states:
+            click.echo("❌ No states found for this country.")
+            raise click.Abort()
+        
+        # Format state choices
+        def format_state(state):
+            name = state.get("name", "Unknown")
+            code = state.get("state_code", "N/A")
+            return f"{name} ({code})"
+        
+        return select_from_dict(
+            message,
+            states,
+            display_key="name",
+            value_key="id",
+            format_choice=format_state
+        )
+    except Exception as e:
+        click.echo(f"❌ Error fetching states: {e}")
+        raise click.Abort()
+
+
+def select_city(client, state_id: Optional[str] = None, message: str = "Select a city"):
+    """
+    Fetch cities and present an interactive selection menu.
+    
+    Args:
+        client: KnowrithmClient instance
+        state_id: Optional state ID to filter cities
+        message: The prompt message
+        
+    Returns:
+        Tuple of (city_id, city_dict)
+    """
+    import click
+    
+    # If no state_id provided, ask user to select a state first
+    if not state_id:
+        click.echo("\n🗺️  First, select a state:")
+        state_id, _ = select_state(client, message="Select state")
+    
+    # Fetch cities
+    try:
+        response = client.get(f"/api/v1/city/state/{state_id}", require_auth=True)
+        
+        # Handle both response formats: list or dict with 'cities' key
+        if isinstance(response, list):
+            cities = response
+        else:
+            cities = response.get("cities", response.get("data", []))
+        
+        if not cities:
+            click.echo("❌ No cities found for this state.")
+            raise click.Abort()
+        
+        # Format city choices
+        def format_city(city):
+            name = city.get("name", "Unknown")
+            return name
+        
+        return select_from_dict(
+            message,
+            cities,
+            display_key="name",
+            value_key="id",
+            format_choice=format_city
+        )
+    except Exception as e:
+        click.echo(f"❌ Error fetching cities: {e}")
+        raise click.Abort()

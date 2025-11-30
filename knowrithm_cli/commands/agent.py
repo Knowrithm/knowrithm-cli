@@ -753,6 +753,7 @@ def agent_stats(auth: str, agent_name_or_id: Optional[str], format: str) -> None
 @click.option("--query", "-q", help="Test query to send to the agent")
 @click.option("--payload", help="Optional JSON test payload")
 @click.option("--wait/--no-wait", default=True, show_default=True)
+@click.option("--interactive", "-i", is_flag=True, help="Start interactive chat session after test")
 def test_agent(
     auth: str,
     format: str,
@@ -760,6 +761,7 @@ def test_agent(
     query: Optional[str],
     payload: Optional[str],
     wait: bool,
+    interactive: bool,
 ) -> None:
     """Run a test query against an agent.
     
@@ -771,6 +773,9 @@ def test_agent(
         
         # Test specific agent
         knowrithm agent test "Support Bot" --query "Hello"
+        
+        # Test and start interactive chat
+        knowrithm agent test --interactive
     """
     client = make_client()
     resolver = NameResolver(client)
@@ -800,7 +805,7 @@ def test_agent(
     else:
         body = None
     
-    click.echo(f"Testing agent '{agent_name_or_id}'...", err=True)
+    click.echo(f"\n🧪 Testing agent '{agent_name_or_id}'...\n")
     
     response = client.post(
         f"/api/v1/agent/{agent_id}/test",
@@ -809,9 +814,165 @@ def test_agent(
     )
     
     if response.get("task_id"):
-        response = client.handle_async_response(response, wait=wait)
+        from rich.spinner import Spinner
+        from rich.live import Live
+        import time
+        
+        with Live(Spinner("dots", text="Agent is thinking..."), refresh_per_second=10) as live:
+            response = client.handle_async_response(response, wait=wait)
     
-    click.echo(format_output(response, format))
+    # Custom formatting for test results
+    if format == "table" and isinstance(response, dict):
+        _display_test_results(response)
+        
+        # Ask if user wants to start interactive chat
+        if interactive:
+            _start_interactive_chat_from_test(client, agent_id, agent_name_or_id, auth_kwargs(auth))
+    else:
+        # Use standard formatting for other formats
+        click.echo(format_output(response, format))
+
+
+def _display_test_results(response: dict) -> None:
+    """Display test results in a beautiful, readable format."""
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.markdown import Markdown
+    from rich.table import Table
+    from rich import box
+    
+    console = Console()
+    
+    # Extract data from response
+    data = response.get("data", response)
+    if isinstance(data, str):
+        try:
+            import json
+            data = json.loads(data)
+        except:
+            data = response
+    
+    # Get key fields
+    agent_info = data.get("agent", {})
+    agent_name = agent_info.get("name", "Unknown Agent")
+    query_text = data.get("query", "N/A")
+    response_text = data.get("response", "No response")
+    citations = data.get("citations", [])
+    llm_config = data.get("llm_config", {})
+    metadata = data.get("metadata", {})
+    
+    # 1. Header with agent info
+    console.print(f"\n[bold cyan]🤖 Agent:[/bold cyan] {agent_name}")
+    if llm_config:
+        provider = llm_config.get("provider", "N/A")
+        model = llm_config.get("model", "N/A")
+        console.print(f"[dim]Model: {provider}/{model}[/dim]")
+    
+    # 2. Query section
+    console.print(f"\n[bold yellow]❓ Query:[/bold yellow]")
+    console.print(Panel(query_text, border_style="yellow", box=box.ROUNDED))
+    
+    # 3. Response section
+    console.print(f"\n[bold green]💬 Response:[/bold green]")
+    console.print(Panel(response_text, border_style="green", box=box.ROUNDED, padding=(1, 2)))
+    
+    # 4. Citations section
+    if citations:
+        console.print(f"\n[bold blue]📚 Sources ({len(citations)}):[/bold blue]")
+        
+        citations_table = Table(show_header=True, header_style="bold blue", box=box.SIMPLE)
+        citations_table.add_column("#", style="cyan", width=4)
+        citations_table.add_column("Source", style="white")
+        citations_table.add_column("Cited", justify="center", width=8)
+        
+        for citation in citations:
+            source_num = str(citation.get("source_number", "?"))
+            doc_name = citation.get("document_name", "Unknown")
+            cited = "✓" if citation.get("cited", False) else "✗"
+            cited_style = "green" if citation.get("cited", False) else "dim"
+            
+            # Clean up source display
+            if doc_name.startswith("Source"):
+                doc_name = doc_name.split(":", 1)[1].strip() if ":" in doc_name else doc_name
+            
+            citations_table.add_row(
+                source_num,
+                doc_name,
+                f"[{cited_style}]{cited}[/{cited_style}]"
+            )
+        
+        console.print(citations_table)
+    
+    # 5. Metadata section (if available)
+    if metadata and any(metadata.values()):
+        console.print(f"\n[bold magenta]ℹ️  Metadata:[/bold magenta]")
+        
+        meta_table = Table(show_header=False, box=box.SIMPLE, padding=(0, 1))
+        meta_table.add_column("Key", style="cyan")
+        meta_table.add_column("Value", style="white")
+        
+        if metadata.get("all_sources"):
+            sources_count = len(metadata["all_sources"])
+            meta_table.add_row("Total Sources", str(sources_count))
+        
+        if metadata.get("cited_sources"):
+            cited_count = len(metadata["cited_sources"])
+            meta_table.add_row("Cited Sources", str(cited_count))
+        
+        if metadata.get("warnings"):
+            warnings = metadata["warnings"]
+            if warnings:
+                meta_table.add_row("Warnings", str(warnings))
+        
+        console.print(meta_table)
+    
+    # 6. Success indicator
+    status = response.get("status", "unknown")
+    http_status = response.get("http_status", response.get("Http Status", 200))
+    
+    if status == "success" or http_status == 200:
+        console.print(f"\n[bold green]✅ Test completed successfully![/bold green]\n")
+    else:
+        console.print(f"\n[bold red]❌ Test failed[/bold red]\n")
+
+
+def _start_interactive_chat_from_test(client, agent_id: str, agent_name: str, auth_kw: dict) -> None:
+    """Start an interactive chat session after testing."""
+    from ..interactive import confirm
+    
+    if not confirm("\n💬 Would you like to start an interactive chat session with this agent?", default=True):
+        return
+    
+    click.echo(f"\n🚀 Starting chat with {agent_name}...\n")
+    
+    # Create conversation
+    conv_payload = {
+        "agent_id": agent_id,
+        "title": f"Chat with {agent_name}"
+    }
+    
+    try:
+        conv_response = client.post("/api/v1/conversation", json=conv_payload, **auth_kw)
+        conversation_id = conv_response.get("id")
+        
+        if not conversation_id:
+            # Fallback if ID is not directly in response
+            if "data" in conv_response and isinstance(conv_response["data"], dict):
+                conversation_id = conv_response["data"].get("id")
+            elif "conversation" in conv_response:
+                conversation_id = conv_response["conversation"].get("id")
+        
+        if not conversation_id:
+            click.echo("❌ Failed to create conversation.")
+            return
+        
+        # Start interactive chat
+        from .conversation import run_interactive_chat
+        run_interactive_chat(client, conversation_id, auth_kw)
+        
+    except Exception as e:
+        click.echo(f"❌ Error starting chat: {e}")
+
 
 
 @cmd.command("clone")
