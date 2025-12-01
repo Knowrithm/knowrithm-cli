@@ -2,6 +2,8 @@
 
 A comprehensive Python command-line interface for the Knowrithm enterprise multi-agent chatbot platform. The CLI provides full access to the REST API, enabling developers and operators to manage agents, ingest content, handle leads, analyze conversations, and query analytics directly from the terminal.
 
+<a href="https://ufind.best/products/knowrithm-cli?utm_source=knowrithm-cli" target="_blank" rel="noopener"><img src="https://ufind.best/badges/ufind-best-badge-dark.svg" alt="Featured on ufind.best" width="150" /></a>
+
 ## 🎉 What's New - Enhanced User Experience!
 
 The CLI has been significantly improved with user-friendly features:
