@@ -331,11 +331,9 @@ knowrithm --version
 knowrithm auth me
 
 # Re-login
-knowrithm auth logout
+# Re-login
+knowrithm auth clear --all
 knowrithm auth login
-
-# Refresh tokens
-knowrithm auth refresh
 ```
 
 ### Name Resolution Issues

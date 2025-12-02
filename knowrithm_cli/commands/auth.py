@@ -102,39 +102,6 @@ def login(email: str, password: str, wait: bool, format: str) -> None:
         click.echo(format_output(response, format))
 
 
-@cmd.command("logout")
-@format_option()
-def logout(format: str) -> None:
-    """Revoke the current session and clear cached tokens."""
-    client = make_client()
-    response = client.post("/api/v1/auth/logout")
-    config.clear_jwt_tokens()
-    click.secho("Logged out and cleared cached tokens.", fg="green")
-    click.echo(format_output(response, format))
-
-
-@cmd.command("refresh")
-@format_option()
-def refresh_tokens(format: str) -> None:
-    """Refresh the access token using the cached refresh token."""
-    tokens = config.get_jwt_tokens()
-    refresh_token = tokens.get("refresh_token")
-    if not refresh_token:
-        raise click.ClickException(
-            "No refresh token stored. Please login again or provide an API key."
-        )
-    client = make_client()
-    response = client.post(
-        "/api/v1/auth/refresh",
-        headers={"Authorization": f"Bearer {refresh_token}"},
-        use_jwt=False,
-        require_auth=False,
-    )
-    tokens = _extract_tokens(response) or response
-    if tokens:
-        _store_tokens(tokens)
-    click.echo(format_output(response, format))
-
 
 @cmd.command("register")
 @format_option()
@@ -194,11 +161,4 @@ def clear(clear_all: bool, tokens: bool, clear_api: bool) -> None:
         click.echo("Nothing to clear. Use --tokens, --api-key or --all.")
 
 
-@cmd.command("validate")
-@auth_option()
-@format_option()
-def validate(auth: str, format: str) -> None:
-    """Validate current credentials with the backend."""
-    client = make_client()
-    response = client.get("/api/v1/auth/validate", **auth_kwargs(auth))
-    click.echo(format_output(response, format))
+

@@ -49,7 +49,6 @@ def create_commands_table() -> Table:
         ("💬 conversation", "Manage conversations", "knowrithm conversation list"),
         ("📄 document", "Manage documents", "knowrithm document list"),
         ("👥 lead", "Manage leads", "knowrithm lead list"),
-        ("🏢 company", "Manage companies", "knowrithm company current"),
         ("🔐 auth", "Authentication", "knowrithm auth login"),
         ("📊 analytics", "View analytics", "knowrithm analytics dashboard"),
         ("⚙️  settings", "LLM settings", "knowrithm settings list"),

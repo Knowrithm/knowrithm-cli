@@ -312,7 +312,6 @@ knowrithm admin metrics
 # ✅ Correct
 knowrithm admin audit-log --entity-type agent
 knowrithm admin metrics
-knowrithm company list
 
 # ❌ Incorrect (don't exist)
 knowrithm admin system-metrics

@@ -28,7 +28,6 @@ knowrithm dashboard
 | 💬 **conversation** | Manage conversations | `knowrithm conversation list` |
 | 📄 **document** | Manage documents | `knowrithm document list` |
 | 👥 **lead** | Manage leads | `knowrithm lead list` |
-| 🏢 **company** | Manage companies | `knowrithm company current` |
 | 🔐 **auth** | Authentication | `knowrithm auth login` |
 | 📊 **analytics** | View analytics | `knowrithm analytics dashboard` |
 | ⚙️ **settings** | LLM settings | `knowrithm settings list` |
@@ -145,14 +144,7 @@ knowrithm auth login
 # Check current user
 knowrithm auth me
 
-# Refresh token
-knowrithm auth refresh
 
-# Logout
-knowrithm auth logout
-
-# Validate credentials
-knowrithm auth validate
 ```
 
 ## 📊 Analytics
@@ -264,8 +256,7 @@ knowrithm config show
 # Test connection
 knowrithm system health
 
-# Validate auth
-knowrithm auth validate
+
 
 # Clear and re-login
 knowrithm auth clear --all

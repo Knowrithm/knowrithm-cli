@@ -427,34 +427,9 @@ knowrithm admin audit-log --risk-level high
 ```bash
 # View system metrics
 knowrithm admin system-metrics
-
-# For specific company (super admin)
-knowrithm admin system-metrics --company-id <company-id>
 ```
 
 ## Super Admin Commands
-
-### Company Management
-
-```bash
-# List companies
-knowrithm superadmin companies list
-
-# Get company details
-knowrithm superadmin companies get <company-id>
-
-# Create company
-knowrithm superadmin companies create --payload '{
-  "name": "Acme Corp",
-  "email": "admin@acme.com"
-}'
-
-# Update company
-knowrithm superadmin companies update <company-id> --payload '{"name": "New Name"}'
-
-# Delete company
-knowrithm superadmin companies delete <company-id>
-```
 
 ### Advanced Analytics
 
@@ -599,11 +574,9 @@ knowrithm agent get "Suport Bot"
 knowrithm auth me
 
 # Re-login if needed
-knowrithm auth logout
+# Re-login if needed
+knowrithm auth clear --all
 knowrithm auth login
-
-# Or refresh tokens
-knowrithm auth refresh
 ```
 
 ### Name Resolution Issues

@@ -48,7 +48,6 @@ knowrithm agent create --interactive
 - **Database Integration**: Connection management, schema analysis, knowledge graphs, text-to-SQL, data exports
 - **Analytics & Reporting**: Dashboards, agent performance, lead analytics, usage metrics, data exports
 - **Lead Management**: Registration, creation, updates, status tracking
-- **Company Administration**: Tenant management, bulk operations, statistics
 - **Website Awareness**: Source registration, crawling, page discovery
 - **LLM Settings**: Provider configuration, model selection, testing
 - **System Utilities**: Health checks, task status polling, geographic data
@@ -241,15 +240,7 @@ knowrithm auth login --email admin@example.com --password
 knowrithm auth me
 ```
 
-**Refresh expired tokens**
-```bash
-knowrithm auth refresh
-```
 
-**Logout and clear tokens**
-```bash
-knowrithm auth logout
-```
 
 ### 2. API Key/Secret
 
@@ -281,12 +272,7 @@ Or using a file:
 knowrithm auth register --payload @registration.json
 ```
 
-### Validation
 
-**Validate current credentials**
-```bash
-knowrithm auth validate
-```
 
 ### Authentication Strategy Selection
 
@@ -556,51 +542,6 @@ knowrithm lead update LEAD_ID --payload UPDATE_DATA
 knowrithm lead delete LEAD_ID
 ```
 
-### Company Management
-
-```bash
-# List companies (super admin)
-knowrithm company list [--page INT] [--per-page INT]
-
-# Get current company
-knowrithm company current
-
-# Get specific company
-knowrithm company get COMPANY_ID
-
-# Create company (public onboarding)
-knowrithm company create --payload COMPANY_DATA
-
-# Update company
-knowrithm company update COMPANY_ID --payload UPDATE_DATA
-
-# Partial update company
-knowrithm company patch COMPANY_ID --payload PARTIAL_DATA
-
-# Delete company
-knowrithm company delete COMPANY_ID
-
-# Restore company
-knowrithm company restore COMPANY_ID
-
-# List deleted companies
-knowrithm company deleted
-
-# Bulk delete companies
-knowrithm company bulk-delete --payload '{"company_ids": [...]}'
-
-# Bulk restore companies
-knowrithm company bulk-restore --payload '{"company_ids": [...]}'
-
-# Get company statistics
-knowrithm company statistics [COMPANY_ID] [--days INT]
-
-# Get related data counts
-knowrithm company related-data COMPANY_ID
-
-# Cascade delete (super admin)
-knowrithm company cascade-delete COMPANY_ID [--payload OPTIONS]
-```
 
 ### LLM Settings Management
 

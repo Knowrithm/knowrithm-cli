@@ -4,7 +4,6 @@ from knowrithm_cli.commands.agent import delete_agent, update_agent
 from knowrithm_cli.commands.document import delete_document, agent_documents
 from knowrithm_cli.commands.conversation import chat, messages
 from knowrithm_cli.commands.database import get_connection
-from knowrithm_cli.commands.company import get_company
 from knowrithm_cli.commands.lead import get_lead
 
 def test_optional_arguments():
@@ -42,26 +41,21 @@ def test_optional_arguments():
     assert is_arg_required(get_connection, "connection_id") is False, "get_connection argument should be optional"
     print("   ✅ Database commands verified")
     
-    # Check Company commands
-    print("5. Checking Company commands...")
-    assert is_arg_required(get_company, "company_id") is False, "get_company argument should be optional"
-    print("   ✅ Company commands verified")
-    
     # Check Lead commands
-    print("6. Checking Lead commands...")
+    print("5. Checking Lead commands...")
     assert is_arg_required(get_lead, "lead_id") is False, "get_lead argument should be optional"
     print("   ✅ Lead commands verified")
     
     # Check Settings commands
     from knowrithm_cli.commands.settings import get_settings, list_company_settings
-    print("7. Checking Settings commands...")
+    print("6. Checking Settings commands...")
     assert is_arg_required(get_settings, "settings_id") is False, "get_settings argument should be optional"
     assert is_arg_required(list_company_settings, "company_id") is False, "list_company_settings argument should be optional"
     print("   ✅ Settings commands verified")
     
     # Check Website commands
     from knowrithm_cli.commands.website import get_source, agent_sources
-    print("8. Checking Website commands...")
+    print("7. Checking Website commands...")
     assert is_arg_required(get_source, "source_id") is False, "get_source argument should be optional"
     assert is_arg_required(agent_sources, "agent_id_or_name") is False, "agent_sources argument should be optional"
     print("   ✅ Website commands verified")
